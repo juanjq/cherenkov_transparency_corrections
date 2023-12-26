@@ -1,4 +1,3 @@
-from venv import logger
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd
@@ -93,10 +92,10 @@ def delete_directory(directory_path):
     
     try:
         os.rmdir(directory_path)
-        logger.debug(f"Directory '{directory_path}' deleted successfully.")
+        print(f"Directory '{directory_path}' deleted successfully.")
         
     except OSError as error:
-        logger.debug(f"Error deleting directory '{directory_path}': {error}")
+        print(f"Error deleting directory '{directory_path}': {error}")
 
 
 def sort_based(x_array, ref_array):
