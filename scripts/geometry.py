@@ -122,20 +122,65 @@ def likelihood_plaw(params, x, y):
         float: The likelihood value.
 
     """
-    A, k = params[0], params[1]
-    y_pred = plaw(x, A, k)
+    norm, pindex = params[0], params[1]
+    y_pred = powerlaw(x, norm, pindex)
     return np.sum((y - y_pred)**2)
 
-def plaw(x, A, k):
+def powerlaw(intensity, norm, pindex):
     """
     Calculate the power-law function.
 
     Parameters:
-    x (float): The input value.
-    A (float): The amplitude of the power-law function.
-    k (float): The exponent of the power-law function.
+    intensity (float): The input intensity.
+    norm (float): The amplitude.
+    pindex (float): The power-law exponent.
 
     Returns:
-    float: The result of the power-law function.
+    float: The calculated value of the power-law function.
     """
-    return A * x ** k
+    return norm * np.exp(intensity / reference_intensity * pindex)
+
+def calc_light_yield(normr, normf, alphaf):
+    """
+    Calculate the light yield based on the reference point, AR, alphaR, A2, and alpha2.
+
+    Parameters:
+    refpoint (float): The reference point.
+    AR (float): The AR value.
+    alphaR (float): The alphaR value.
+    A2 (float): The A2 value.
+    alpha2 (float): The alpha2 value.
+
+    Returns:
+    float: The calculated light yield.
+    """
+    return (normf / normr) ** (- 1 / ( 1 + alphaf))
+
+def pol2(x, a, b, c):
+    """
+    Calculates the value of a second-degree polynomial.
+
+    Parameters:
+    x (float): The input value.
+    a (float): The coefficient of the constant term.
+    b (float): The coefficient of the linear term.
+    c (float): The coefficient of the quadratic term.
+
+    Returns:
+    float: The value of the polynomial at the given input value.
+    """
+    return a + b * x + c * x * x
+
+def angular_dist(az1, az2):
+    """
+    Calculate the angular distance between two azimuth angles.
+
+    Parameters:
+    az1 (float): The first azimuth angle in degrees.
+    az2 (float): The second azimuth angle in degrees.
+
+    Returns:
+    float: The angular distance between the two azimuth angles.
+    """
+    angular_distance_abs = abs(az1 - az2)
+    return min(angular_distance_abs, 360 - angular_distance_abs)
