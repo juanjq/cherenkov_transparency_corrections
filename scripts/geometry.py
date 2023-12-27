@@ -109,7 +109,7 @@ def LRTFreeZero(x, y, uy):
 
     return lrt, LS_free.x, LS_zero.x
 
-def likelihood_plaw(params, x, y):
+def likelihood_plaw(params, x, y, reference_intensity):
     """
     Calculate the likelihood of a power-law model given the parameters and observed data.
 
@@ -123,10 +123,10 @@ def likelihood_plaw(params, x, y):
 
     """
     norm, pindex = params[0], params[1]
-    y_pred = powerlaw(x, norm, pindex)
+    y_pred = powerlaw(x, reference_intensity, norm, pindex)
     return np.sum((y - y_pred)**2)
 
-def powerlaw(intensity, norm, pindex):
+def powerlaw(intensity, reference_intensity, norm, pindex):
     """
     Calculate the power-law function.
 
@@ -138,7 +138,7 @@ def powerlaw(intensity, norm, pindex):
     Returns:
     float: The calculated value of the power-law function.
     """
-    return norm * np.exp(intensity / reference_intensity * pindex)
+    return norm * (intensity / reference_intensity) ** pindex
 
 def calc_light_yield(normr, normf, alphaf):
     """
