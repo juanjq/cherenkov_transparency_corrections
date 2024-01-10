@@ -2,8 +2,6 @@ import numpy as np
 import glob
 import os
 import sys
-import geometry as geom
-import auxiliar as aux
 
 def add_dl1_paths_to_dict(DICT, dl1_root, dchecking=False):
     """
@@ -63,7 +61,7 @@ def add_dl1_paths_to_dict(DICT, dl1_root, dchecking=False):
                 _subrun_num.append(int(f.split(".")[-2]))
         
         # Sorting subruns
-        subrun_num, subrun_files = aux.sort_based(_subrun_files, _subrun_num)
+        subrun_num, subrun_files = sort_based( _subrun_files, _subrun_num)
 
         # first we make sure there is at least one subrun
         if len(subrun_files) == 0:
@@ -117,6 +115,21 @@ def add_dl1_paths_to_dict(DICT, dl1_root, dchecking=False):
     print(f"...Finished adding dl1 data to dictionary")
     return DICT
 
+
+def angular_dist(az1, az2):
+    """
+    Calculate the angular distance between two azimuth angles.
+
+    Parameters:
+    az1 (float): The first azimuth angle in degrees.
+    az2 (float): The second azimuth angle in degrees.
+
+    Returns:
+    float: The angular distance between the two azimuth angles.
+    """
+    angular_distance_abs = abs(az1 - az2)
+    return min(angular_distance_abs, 360 - angular_distance_abs)
+
 def add_mc_and_rfs_nodes(DICT, rfs_root, mcs_root, dict_source):
     """
     Add MC and RF nodes to the given dictionary.
@@ -162,7 +175,7 @@ def add_mc_and_rfs_nodes(DICT, rfs_root, mcs_root, dict_source):
         zds_zd   = zds[mask_zd]
         azs_zd   = azs[mask_zd]
 
-        dist_mcs_az = np.array([geom.angular_dist(azs_zd[i], _az) for i in range(len(azs_zd))])
+        dist_mcs_az = np.array([angular_dist(azs_zd[i], _az) for i in range(len(azs_zd))])
 
         closest_node = nodes[np.argmin(dist_mcs_az)]
 
@@ -192,3 +205,16 @@ def add_mc_and_rfs_nodes(DICT, rfs_root, mcs_root, dict_source):
     }
 
     return DICT, dict_nodes
+
+def sort_based(x_array, ref_array):
+    """
+    Sorts the array ref_array in ascending order and rearranges the array x_array based on the sorted ref_array values.
+
+    Parameters:
+    x_array (array-like): The array to be rearranged based on ref_array.
+    ref_array (array-like): The reference array used for sorting.
+
+    Returns:
+    tuple: A tuple containing two arrays. The first array is the sorted ref_array, and the second array is x_array rearranged based on the sorted ref_array values.
+    """
+    return np.sort(ref_array), np.array([x for ref, x in sorted(zip(ref_array, x_array))])

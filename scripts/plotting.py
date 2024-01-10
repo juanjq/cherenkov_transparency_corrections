@@ -101,7 +101,7 @@ def get_colors_multiplot(array, input_colors=default_colors, range=None):
     else:
         m, M = min(array), max(array)
     
-    for i in range(len(array)):
+    for i in np.arange(len(array)):
         
         if array[i] > M:
             output_colors.append(color_gradient(1, input_colors))
