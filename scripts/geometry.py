@@ -123,22 +123,38 @@ def likelihood_plaw(params, x, y, reference_intensity):
 
     """
     norm, pindex = params[0], params[1]
-    y_pred = powerlaw(x, reference_intensity, norm, pindex)
+    y_pred = powerlaw(x, norm, pindex)
     return np.sum((y - y_pred)**2)
 
-def powerlaw(intensity, reference_intensity, norm, pindex):
+def powerlaw(x, norm, pindex):
     """
-    Calculate the power-law function.
+    Power-law function.
 
     Parameters:
-    intensity (float): The input intensity.
+    x (float): The input value.
     norm (float): The amplitude.
     pindex (float): The power-law exponent.
 
     Returns:
     float: The calculated value of the power-law function.
     """
-    return norm * (intensity / reference_intensity) ** pindex
+    return norm * (x) ** pindex
+
+    
+def expfunc(x, a, b):
+    """
+    Exponential function.
+
+    Parameters:
+    x (float): The input value.
+    a (float): The amplitude.
+    b (float): The exponential index.
+
+    Returns:
+    float: The calculated value of the exponential function.
+    """    
+    return a * np.exp(b * x)
+
 
 def calc_light_yield(normr, normf, alphaf):
     """
@@ -154,7 +170,7 @@ def calc_light_yield(normr, normf, alphaf):
     Returns:
     float: The calculated light yield.
     """
-    return (normf / normr) ** (- 1 / ( 1 + alphaf))
+    return (normr / normf) ** (1 / ( 1 + alphaf))
 
 def pol2(x, a, b, c):
     """
