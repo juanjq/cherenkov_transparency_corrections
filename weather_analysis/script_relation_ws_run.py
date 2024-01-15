@@ -77,14 +77,14 @@ def run(string):
                 ws_entry.append(None)
                 
                 run.append(dict_dcheck["run"][j])
-                srun.append(dict_dcheck["subrun"][j])
+                srun.append(dict_dcheck["srun"][j])
 
             else:
                 str_id = str(df_ws.iloc[np.argmin(np.abs(dates_ws - date_dcheck))].name)
 
                 ws_entry.append(str_id)
                 run.append(dict_dcheck["run"][j])
-                srun.append(dict_dcheck["subrun"][j])
+                srun.append(dict_dcheck["srun"][j])
 
     print("Writting...")
     with open(fname_run_night_relation, "a") as f:
