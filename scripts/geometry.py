@@ -171,7 +171,21 @@ def calc_light_yield(normr, normf, alphaf):
     float: The calculated light yield.
     """
     return (normr / normf) ** (1 / ( 1 + alphaf))
+    
+def straight_line(x, intercept, slope):
+    """
+    Straight line function.
 
+    Parameters:
+    x (float): The input value.
+    intercept (float): The intercept.
+    slope (float): The slope.
+
+    Returns:
+    float: The calculated value of the straight line function.
+    """
+    return intercept + slope * x
+    
 def pol2(x, a, b, c):
     """
     Calculates the value of a second-degree polynomial.
