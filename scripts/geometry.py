@@ -156,7 +156,7 @@ def expfunc(x, a, b):
     return a * np.exp(b * x)
 
 
-def calc_light_yield(normr, normf, alphaf):
+def calc_light_yield(p0_fit, p1_fit, sigma_p0_fit, sigma_p1_fit, p0_ref):
     """
     Calculate the light yield based on the reference point, AR, alphaR, A2, and alpha2.
 
@@ -169,8 +169,19 @@ def calc_light_yield(normr, normf, alphaf):
 
     Returns:
     float: The calculated light yield.
+    float: The error in the light yield
     """
-    return (normr / normf) ** (1 / ( 1 + alphaf))
+
+    power_factor = (- 1 / ( 1 + p1_fit))
+
+    ly    = (p0_fit / p0_ref) ** power_factor
+    
+    dlydA = (p0_fit / p0_ref) ** power_factor * 1 / (1 + p1_fit)    * (-1) / p0_fit
+    dlyda = (p0_fit / p0_ref) ** power_factor * 1 / (1 + p1_fit)**2 * np.log(p0_fit / p0_ref) 
+
+    delta_ly = np.sqrt((dlydA) ** 2 * sigma_p0_fit ** 2 + (dlyda) ** 2 * sigma_p1_fit ** 2)
+    
+    return ly, delta_ly
     
 def straight_line(x, intercept, slope):
     """
