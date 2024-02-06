@@ -1,6 +1,3 @@
-"""
-"""
-
 import numpy as np
 import astropy.units as u
 from datetime import datetime
@@ -56,6 +53,7 @@ def main(run_number, source_name, root_data, subruns_num=None):
     # Data main directory
     root_data = os.path.join(root_data, source_name)
 
+    run_number  = int(run_number)
     run_numbers = [run_number]
 
     # Creating the directories in case they don't exist
@@ -264,5 +262,5 @@ def main(run_number, source_name, root_data, subruns_num=None):
 if __name__ == "__main__":
     run_num     = sys.argv[1]
     source_name = "crab"
-    root_data   = "/fefs/aswg/workspace/juan.jimenez/data/cherenkov_transparency_corrections"
+    root_data   = "/fefs/aswg/workspace/juan.jimenez/data/cherenkov_transparency_corrections/crab/performance_paper/"
     main(run_num, source_name, root_data)

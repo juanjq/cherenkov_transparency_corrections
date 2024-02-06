@@ -13,7 +13,7 @@ while read -r line; do
     str="$line"
 
     # Create a new temporary job script if the counter is a multiple of 3
-    if (( counter % 3 == 0 )); then
+    if (( counter % 5 == 0 )); then
       echo "#! /bin/bash" > "bash_dl1a_to_dl1b_tmpjob.sh"
     fi
 
@@ -24,9 +24,9 @@ while read -r line; do
     echo "Adding $str to tmp job"
 
     # Check if the counter is 3
-    if (( counter % 3 == 0 )); then
+    if (( counter % 5 == 0 )); then
       echo -e "Sending tmp job group to the queue...\n"
-      sbatch -p long --output="/fefs/aswg/workspace/juan.jimenez/cherenkov_transparency_corrections/data_processing/objects/output_slurm/slurm-%j.out" "bash_dl1a_to_dl1b_tmpjob_$((counter/3)).sh"
+      sbatch -p long --output="/fefs/aswg/workspace/juan.jimenez/cherenkov_transparency_corrections/data_processing/objects/output_slurm/slurm-%j.out" "bash_dl1a_to_dl1b_tmpjob.sh"
       counter=0
     fi
   fi
@@ -34,7 +34,7 @@ while read -r line; do
 done < "$file"
 
 # Check if the counter is 1 or 2
-if (( counter == 1 || counter == 2 )); then
+if (( counter == 1 || counter == 2 || counter == 3 || counter == 4 )); then
   echo -e "Sending job group to the queue...\n"
-  sbatch -p long --output="/fefs/aswg/workspace/juan.jimenez/cherenkov_transparency_corrections/data_processing/objects/output_slurm/slurm-%j.out" "bash_dl1a_to_dl1b_tmpjob_$((counter/3)).sh"
+  sbatch -p long --output="/fefs/aswg/workspace/juan.jimenez/cherenkov_transparency_corrections/data_processing/objects/output_slurm/slurm-%j.out" "bash_dl1a_to_dl1b_tmpjob.sh"
 fi
