@@ -6,6 +6,7 @@ import pandas as pd
 from scipy.optimize import curve_fit
 from scipy.stats import chi2
 from scipy import optimize
+import subprocess
 
 from traitlets.config.loader import Config
 from astropy.coordinates     import SkyCoord
@@ -20,7 +21,9 @@ import geometry as geom
 import lstpipeline
 
 import logging
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.INFO)
 
 """
 Source name in order to just complete the results file, and
@@ -78,43 +81,6 @@ root_dl1 = "/fefs/aswg/data/real/DL1/*/v0.*/tailcut84/"
 root_rfs = "/fefs/aswg/data/models/AllSky/20230901_v0.10.4_allsky_base_prod/"
 root_mcs = "/fefs/aswg/data/mc/DL2/AllSky/20230901_v0.10.4_allsky_base_prod/TestingDataset/"
 
-# Root path of this script
-root = os.getcwd() + "/"
-# Path to store the configuration file we are going to use
-config_file = root + "config/standard_config.json"
-# Path to store objects
-root_objects = root + f"objects/"
-# Data main directory
-root_data = root + f"../../data/cherenkov_transparency_corrections/{source_name}/performance_paper/"
-# Directory for the results of the fit of each run
-root_results = root_objects + "results_fits/"
-
-# Create the paths that do not exist
-for path in [os.path.dirname(config_file), root_objects, root_results]:
-    if not os.path.exists(path):
-        os.makedirs(os.path.join(path), exist_ok=True)
-
-# The results dictionary with all the results from the processing steps
-dict_fname = root_results + f"results_run_{run_number}.pkl"
-
-""" Empty dictionary to store all the results of one run."""
-dict_results_empty = { 
-    "run": run_number, "filenames": {},
-    "scaled" :           {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "p0":                {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "delta_p0":          {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "p1":                {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "delta_p1":          {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "chi2":              {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "pvalue":            {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "light_yield":       {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "delta_light_yield": {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "scaling":           {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "delta_scaling":     {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "scaling_percent":       {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "delta_scaling_percent": {"original": {}, "upper": {}, "linear": {}, "final": {}},
-    "final_scaling": {}, "final_scaling_interpolated": {}, "interpolation" : {},
-}
 
 def main(run_number):
     """
@@ -126,6 +92,47 @@ def main(run_number):
         The run number to analyze
     """
 
+    # Converting run number to integer
+    run_number = int(run_number)
+
+    # Root path of this script
+    root = os.getcwd() + "/"
+    # Path to store the configuration file we are going to use
+    config_file = root + "config/standard_config.json"
+    # Path to store objects
+    root_objects = root + f"objects/"
+    # Data main directory
+    root_data = root + f"../../data/cherenkov_transparency_corrections/{source_name}/performance_paper/"
+    # Directory for the results of the fit of each run
+    root_results = root_objects + "results_fits/"
+    
+    # Create the paths that do not exist
+    for path in [os.path.dirname(config_file), root_objects, root_results]:
+        if not os.path.exists(path):
+            os.makedirs(os.path.join(path), exist_ok=True)
+        
+    """ Empty dictionary to store all the results of one run."""
+    dict_results_empty = { 
+        "run": run_number, "filenames": {},
+        "scaled" :           {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "p0":                {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "delta_p0":          {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "p1":                {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "delta_p1":          {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "chi2":              {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "pvalue":            {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "light_yield":       {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "delta_light_yield": {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "scaling":           {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "delta_scaling":     {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "scaling_percent":       {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "delta_scaling_percent": {"original": {}, "upper": {}, "linear": {}, "final": {}},
+        "final_scaling": {}, "final_scaling_interpolated": {}, "interpolation" : {},
+    }
+
+    # The results dictionary with all the results from the processing steps
+    dict_fname = root_results + f"results_run_{run_number}.pkl"
+    
     # Creating configuration
     dict_config = get_standard_config()
     # We select the heuristic flatfield option in the standard configuration
@@ -179,7 +186,7 @@ def main(run_number):
 
     # Reading binning from datachecks
     ref_intensity = (limits_intensity[0] * limits_intensity[1]) ** 0.5
-    logger.info(f"The intensity in the middle of the intensity range is {ref_intensity:.1f} p.e.")
+    logger.info(f"\nThe intensity in the middle of the intensity range is {ref_intensity:.1f} p.e.")
     
     ########################################################
     # Reading the binning from the datacheck ---------------
@@ -256,7 +263,6 @@ def main(run_number):
         
         # Processing subrun by subrun
         for srun in sruns_array:    
-            logger.info(f"\nProcessing subrun {srun}/{len(sruns_array)}")
     
             input_fname = dict_dchecks[run_number]["dl1a"]["srunwise"][srun]   # Input dl1a        
             data_scale_factor = dict_results["scaled"][iteration_step][srun]   # Reading the scaling factor
@@ -270,6 +276,8 @@ def main(run_number):
             # If is the second or third: "upper" or "linear"
             # We perform lstchain_dl1ab but over a subset of the data only to keep it shorter
             elif iteration_step in ["upper", "linear"]:
+
+                logger.info(f"\nProcessing {iteration_step} subrun {srun}/{len(sruns_array)}")
     
                 # Temporal dl1 file that will be overwritten in the next iteration / subrun
                 data_output_fname = root_objects + f"tmp_dl1_srunwise_{iteration_step}_scaled.h5" 
@@ -286,18 +294,20 @@ def main(run_number):
                 # If the file already exists we delete it
                 if os.path.exists(data_output_fname):
                     os.remove(data_output_fname)
-            
-                !lstchain_dl1ab \
-                --input-file $input_fname \
-                --output-file $data_output_fname \
-                --config $config_file \
-                --no-image \
-                --light-scaling $data_scale_factor \
-                --intensity-range $dl1_selected_range
+
+
+                command = f"lstchain_dl1ab --input-file {input_fname} --output-file {data_output_fname} --config {config_file}"
+                command = command + f" --no-image --light-scaling {data_scale_factor} --intensity-range {dl1_selected_range}"
+                print(command)
+                subprocess.run(command, shell=True)
+
+
     
             # If is the last step i.e. "final"
             # The lstchain_dl1ab script is run over all thedataset to generate the final file
             elif iteration_step == "final":
+
+                logger.info(f"\nProcessing {iteration_step} subrun {srun}/{len(sruns_array)}")
     
                 data_output_fname = root_data + f"dl1_scaled/{run_number:05}/" + os.path.basename(dict_dchecks[run_number]["dl1a"]["srunwise"][srun])
                 logger.info(f"Running lstchain_dl1ab... scale: {data_scale_factor:.2f}")
@@ -305,14 +315,11 @@ def main(run_number):
                 # If the file already exists we delete it
                 if os.path.exists(data_output_fname):
                     os.remove(data_output_fname)
-            
-                !lstchain_dl1ab \
-                --input-file $input_fname \
-                --output-file $data_output_fname \
-                --config $config_file \
-                --no-image \
-                --light-scaling $data_scale_factor
-    
+
+                command = f"lstchain_dl1ab --input-file {input_fname} --output-file {data_output_fname} --config {config_file}"
+                command = command + f" --no-image --light-scaling {data_scale_factor}"
+                subprocess.run(command, shell=True)
+
                 # We store this info also in the dictionary in the final case
                 dict_results["filenames"][srun] = data_output_fname
         

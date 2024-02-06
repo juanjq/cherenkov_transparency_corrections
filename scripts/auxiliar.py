@@ -7,6 +7,12 @@ import shutil
 import matplotlib.colors as colors
 from scipy.stats import chi2
 
+import logging
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.INFO)
+
+
 # Some symbols to add easily to text
 sigma = "$\sigma$"
 mu    = "$\mu$"
@@ -92,10 +98,10 @@ def delete_directory(directory_path):
     
     try:
         os.rmdir(directory_path)
-        print(f"Directory '{directory_path}' deleted successfully.")
+        logger.info(f"Directory '{directory_path}' deleted successfully.")
         
     except OSError as error:
-        print(f"Error deleting directory '{directory_path}': {error}")
+        logger.error(f"Error deleting directory '{directory_path}': {error}")
 
 
 def sort_based(x_array, ref_array):
