@@ -9,9 +9,6 @@ from scipy.stats import chi2
 from scipy import optimize
 import subprocess
 
-from IPython.display import display, HTML
-display(HTML("<style>.container { width:100% !important; }</style>"))
-
 from traitlets.config.loader import Config
 from astropy.coordinates     import SkyCoord
 from lstchain.io.config      import get_standard_config
@@ -84,8 +81,6 @@ root_sub_dl1 = root_objects + "sub_dl1/"
 # Directory for the results of the fit of each run
 root_results = root_objects + "results_fits/"
 root_final_results = root_objects + "final_results_fits/"
-# Slurm output folder
-root_slurm = root + "objects/output_slurm"
 
 def configure_lstchain():
     """Creates a file of standard configuration for the lstchain analysis. 
@@ -608,9 +603,9 @@ def main_merge():
     ##############################################
     # Cleaning some directories with temporal data
     # Iterate over all the entries in the directory
-    for dir_to_delete in [root_sub_dl1, root_slurm]:
+    for dir_to_delete in [root_sub_dl1]:
         for entry in os.listdir(dir_to_delete):
-            entry_path = os.path.join(directory_to_delete, entry)
+            entry_path = os.path.join(dir_to_delete, entry)
         
             # Check if it's a file and delete it
             if os.path.isfile(entry_path):
@@ -929,21 +924,17 @@ def main_final(input_str, simulate_data=False):
         pickle.dump(dict_results, f, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
-    # Check if command-line arguments are provided
-    if len(sys.argv) < 3:
-        print("Usage: python script.py <function_name> <input_string>")
-        sys.exit(1)
-
     # Extract command-line arguments
     function_name = sys.argv[1]
-    input_str = sys.argv[2] if len(sys.argv) == 3 else None
-
+    
     # Call the appropriate function based on the provided function name
     if function_name == 'init':
+        input_str = sys.argv[2]
         main_init(input_str)
     elif function_name == 'merge':
         main_merge()
     elif function_name == 'final':
+        input_str = sys.argv[2]
         main_final(input_str)
     else:
         print(f"Unknown function: {function_name}\nOptions: init, merge, final")
