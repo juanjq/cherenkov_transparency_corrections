@@ -79,9 +79,13 @@ config_file = root + "config/standard_config.json"
 root_objects = root + f"objects/"
 # Data main directory
 root_data = root + f"../../data/cherenkov_transparency_corrections/{source_name}/"
+# Sub-dl1 objects directory
+root_sub_dl1 = root_objects + "sub_dl1/"
 # Directory for the results of the fit of each run
 root_results = root_objects + "results_fits/"
 root_final_results = root_objects + "final_results_fits/"
+# Slurm output folder
+root_slurm = root + "objects/output_slurm"
 
 def configure_lstchain():
     """Creates a file of standard configuration for the lstchain analysis. 
@@ -137,6 +141,7 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
         * "ref_intensity"
         * "dcheck_intensity_binning"
         * "dcheck_intensity_binning_widths"
+        * "dcheck_intensity_binning_centers"
         * "mask_dcheck_bins_fit"
         * "corr_factor_p0"
         * "corr_factor_p1"
@@ -148,6 +153,7 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
     ref_intensity = other_parameters["ref_intensity"]
     dcheck_intensity_binning = other_parameters["dcheck_intensity_binning"]
     dcheck_intensity_binning_widths = other_parameters["dcheck_intensity_binning_widths"]
+    dcheck_intensity_binning_centers = other_parameters["dcheck_intensity_binning_centers"]
     mask_dcheck_bins_fit = other_parameters["mask_dcheck_bins_fit"]
     corr_factor_p0 = other_parameters["corr_factor_p0"]
     corr_factor_p1 = other_parameters["corr_factor_p1"]
@@ -183,7 +189,7 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
         elif iteration_step in ["upper", "linear"]:
 
             # Temporal dl1 file that will be overwritten in the next iteration / subrun
-            data_output_fname = root_objects + f"tmp_dl1_srunwise_{iteration_step}_scaled.h5" 
+            data_output_fname = root_sub_dl1 + f"tmp_dl1_srunwise_run{run_number}_srun{srun}_{iteration_step}_scaled.h5" 
 
             logger.info(f"\nProcessing subrun {srun}")
 
@@ -380,7 +386,7 @@ def main_init(input_str, simulate_data=False):
         "final_scaling": {}, "final_scaling_interpolated": {}, "interpolation" : {},
     }
     # Create the paths that do not exist
-    for path in [os.path.dirname(config_file), root_objects, root_results, root_final_results]:
+    for path in [os.path.dirname(config_file), root_objects, root_results, root_final_results, root_sub_dl1]:
         if not os.path.exists(path):
             os.makedirs(os.path.join(path), exist_ok=True)
     # Creating and storing a configuration file for lstchain processes
@@ -498,6 +504,7 @@ def main_init(input_str, simulate_data=False):
         "ref_intensity" : ref_intensity,
         "dcheck_intensity_binning" : dcheck_intensity_binning,
         "dcheck_intensity_binning_widths" : dcheck_intensity_binning_widths,
+        "dcheck_intensity_binning_centers" : dcheck_intensity_binning_centers,
         "mask_dcheck_bins_fit" : mask_dcheck_bins_fit,
         "corr_factor_p0" : corr_factor_p0,
         "corr_factor_p1" : corr_factor_p1,
@@ -598,6 +605,17 @@ def main_merge():
         total_runs.append(int(file.split("/")[-1].split("_")[2]))
         dictionaries.append(tmp_dict)
 
+    ##############################################
+    # Cleaning some directories with temporal data
+    # Iterate over all the entries in the directory
+    for dir_to_delete in [root_sub_dl1, root_slurm]:
+        for entry in os.listdir(dir_to_delete):
+            entry_path = os.path.join(directory_to_delete, entry)
+        
+            # Check if it's a file and delete it
+            if os.path.isfile(entry_path):
+                os.remove(entry_path)
+            
     ##########################
     # Merging the dictionaries
     # Keep only non-repeated runs
@@ -888,6 +906,7 @@ def main_final(input_str, simulate_data=False):
         "ref_intensity" : ref_intensity,
         "dcheck_intensity_binning" : dcheck_intensity_binning,
         "dcheck_intensity_binning_widths" : dcheck_intensity_binning_widths,
+        "dcheck_intensity_binning_centers" : dcheck_intensity_binning_centers,
         "mask_dcheck_bins_fit" : mask_dcheck_bins_fit,
         "corr_factor_p0" : corr_factor_p0,
         "corr_factor_p1" : corr_factor_p1,
@@ -917,7 +936,7 @@ if __name__ == "__main__":
 
     # Extract command-line arguments
     function_name = sys.argv[1]
-    input_string = sys.argv[2] if len(sys.argv) == 3 else None
+    input_str = sys.argv[2] if len(sys.argv) == 3 else None
 
     # Call the appropriate function based on the provided function name
     if function_name == 'init':
