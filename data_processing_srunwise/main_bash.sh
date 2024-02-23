@@ -16,7 +16,7 @@ job_ids=()
 # Step 1: Submit jobs for each run
 for run_str in $run_strs; do
     # Create a temporary bash script for each run
-    tmp_script_init="$path_objects""tmp_""$run_str""_scaling_init.sh"
+    tmp_script_init="$path_objects""job_""$run_str""_scaling_init.sh"
     echo "#!/bin/bash" > $tmp_script_init
     echo "python $python_script 'init' '$run_str'" >> $tmp_script_init
 
@@ -30,7 +30,7 @@ done
 
 ##########################################################################
 # Step 2: Submit a job to merge information after all previous jobs finish
-merge_script="$path_objects""tmp_""$run_str""merge_script.sh"
+merge_script="$path_objects""job_merge.sh"
 echo "#!/bin/bash" > $merge_script
 echo "python $python_script 'merge'" >> $merge_script
 
@@ -48,7 +48,7 @@ echo "Merge job submitted with Job ID $merge_job_id"
 # Step 3: Submit jobs for each run with a different python script after the merge job finishes
 for run_str in $run_strs; do
     # Create a temporary bash script for each run after merge
-    tmp_script_final="$path_objects""tmp_""$run_str""_scaling_final.sh"
+    tmp_script_final="$path_objects""job_""$run_str""_scaling_final.sh"
     echo "#!/bin/bash" > $tmp_script_final
     echo "python $python_script 'final' '$run_str'" >> $tmp_script_final
 

@@ -157,9 +157,9 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
     run_number  = dict_results["run"]
 
     # Empty arrays to store the fit information
-    data_p0, data_delta_p0  = [], []
-    data_p1, data_delta_p1  = [], []
-    data_chi2, data_pvalue  = [], []
+    data_p0, data_delta_p0 = [], []
+    data_p1, data_delta_p1 = [], []
+    data_chi2, data_pvalue = [], []
     
     # Processing subrun by subrun---------------------------------------------------------------
     for srun in srun_numbers:    
@@ -361,7 +361,8 @@ def main_init(input_str, simulate_data=False):
     # Initial configuring and paths creation
     # Extracting the run number from the input string
     run_number   = int(input_str.split("_")[0])
-    srun_numbers = [int(s) for s in input_str.split("_")[1:]]
+    fist_last_srun = [int(s) for s in input_str.split("_")[1:]]
+    srun_numbers = np.arange(fist_last_srun[0], fist_last_srun[1] + 1)
     """ Empty dictionary to store all the results of one run."""
     dict_results_empty = { 
         "run": run_number, "filenames": {}, "statistics": {}, "flag_error" : {},
@@ -409,16 +410,26 @@ def main_init(input_str, simulate_data=False):
     dict_dchecks = lstpipeline.add_dl1_paths_to_dict(dict_dchecks, root_dl1)
     dict_dchecks = lstpipeline.add_dl1_paths_to_dict(dict_dchecks, root_dl1, dchecking=True)
     
-    tab_dcheck_run = read_table(dict_dchecks[run_number]["dchecks"]["runwise"], "/dl1datacheck/cosmics")
+    dcheck_zd, dcheck_az = [], []
+    dcheck_tstart, dcheck_telapsed = [], []
     
-    # reading the variables
-    dcheck_zd = 90 - np.rad2deg(np.array(tab_dcheck_run["mean_alt_tel"]))
-    dcheck_az = np.rad2deg(np.array(tab_dcheck_run["mean_az_tel"]))
-    dcheck_tstart   = tab_dcheck_run["dragon_time"][0][0]
-    dcheck_telapsed = np.array(tab_dcheck_run["elapsed_time"])
+    for srun in range(len(dict_dchecks[run_number]["dchecks"]["srunwise"])):
+        tab_dcheck_srun = read_table(dict_dchecks[run_number]["dchecks"]["srunwise"][srun], "/dl1datacheck/cosmics")
+        
+        # reading the variables
+        dcheck_zd.append(90 - np.rad2deg(tab_dcheck_srun["mean_alt_tel"]))
+        dcheck_az.append(np.rad2deg(tab_dcheck_srun["mean_az_tel"]))
+        
+        dcheck_tstart.append(tab_dcheck_srun["dragon_time"])
+        dcheck_telapsed.append(tab_dcheck_srun["elapsed_time"])
+    
+    dcheck_zd = np.array(dcheck_zd)
+    dcheck_az = np.array(dcheck_az)
+    dcheck_tstart = np.array(dcheck_tstart)
+    dcheck_telapsed = np.array(dcheck_telapsed)
     
     dict_dchecks[run_number]["time"] = {
-        "tstart"   : dcheck_tstart,            # datetime object
+        "tstart"   : dcheck_tstart[0],            # datetime object
         "telapsed" : np.sum(dcheck_telapsed),  # s
         "srunwise" : {
             "telapsed" : dcheck_telapsed,      # s      
@@ -459,14 +470,15 @@ def main_init(input_str, simulate_data=False):
         (dcheck_intensity_binning_centers >= limits_intensity[0]) &
         (dcheck_intensity_binning_centers <= limits_intensity[1])
     )
-    
-    
+      
     ##########################################################
     # Reading the histogram from the datacheck ---------------
     # Opening the corresponding datacheck
-    tab_dcheck_run = tables.open_file(fname_dcheck)
-    dcheck_hist_intensities = np.array(tab_dcheck_run.root.dl1datacheck.cosmics.col("hist_intensity"))
-    tab_dcheck_run.close()
+    dcheck_hist_intensities = []
+    for fname_dcheck_srun in dict_dchecks[run_number]["dchecks"]["srunwise"]:
+        tab_dcheck_srun = tables.open_file(fname_dcheck_srun)
+        dcheck_hist_intensities.append(np.array(tab_dcheck_srun.root.dl1datacheck.cosmics.col("hist_intensity")))
+        tab_dcheck_srun.close()
     
     # Converting from counts to rate per intensity unit (non-binning dependent quantity)
     dcheck_rates       = [] # Array of histogram of rates for each subrun
@@ -478,9 +490,6 @@ def main_init(input_str, simulate_data=False):
         dcheck_rates.append(              dcheck_hist_intensity  / effective_time_srun / dcheck_intensity_binning_widths)
     
         dcheck_delta_rates.append(np.sqrt(dcheck_hist_intensity) / effective_time_srun / dcheck_intensity_binning_widths)
-    
-    # Subruns array 
-    sruns_array = np.sort([int(f[-7:-3]) for f in dict_dchecks[run_number]["dl1a"]["srunwise"]])
     
     ####################################
     # Zenith correction factors to apply
@@ -705,16 +714,26 @@ def main_merge():
     dict_dchecks = lstpipeline.add_dl1_paths_to_dict(dict_dchecks, root_dl1, dchecking=True)
     
     for run_number in total_runs:
-        tab_dcheck_run = read_table(dict_dchecks[run_number]["dchecks"]["runwise"], "/dl1datacheck/cosmics")
+        dcheck_zd, dcheck_az = [], []
+        dcheck_tstart, dcheck_telapsed = [], []
         
-        # reading the variables
-        dcheck_zd = 90 - np.rad2deg(np.array(tab_dcheck_run["mean_alt_tel"]))
-        dcheck_az = np.rad2deg(np.array(tab_dcheck_run["mean_az_tel"]))
-        dcheck_tstart = tab_dcheck_run["dragon_time"][0][0]
-        dcheck_telapsed = np.array(tab_dcheck_run["elapsed_time"])
-    
+        for srun in range(len(dict_dchecks[run_number]["dchecks"]["srunwise"])):
+            tab_dcheck_srun = read_table(dict_dchecks[run_number]["dchecks"]["srunwise"][srun], "/dl1datacheck/cosmics")
+            
+            # reading the variables
+            dcheck_zd.append(90 - np.rad2deg(tab_dcheck_srun["mean_alt_tel"]))
+            dcheck_az.append(np.rad2deg(tab_dcheck_srun["mean_az_tel"]))
+            
+            dcheck_tstart.append(tab_dcheck_srun["dragon_time"])
+            dcheck_telapsed.append(tab_dcheck_srun["elapsed_time"])
+        
+        dcheck_zd = np.array(dcheck_zd)
+        dcheck_az = np.array(dcheck_az)
+        dcheck_tstart = np.array(dcheck_tstart)
+        dcheck_telapsed = np.array(dcheck_telapsed)
+        
         dict_dchecks[run_number]["time"] = {
-            "tstart"   : dcheck_tstart,            # datetime object
+            "tstart"   : dcheck_tstart[0],            # datetime object
             "telapsed" : np.sum(dcheck_telapsed),  # s
             "srunwise" : {
                 "telapsed" : dcheck_telapsed,      # s      
@@ -731,7 +750,7 @@ def main_merge():
     
     # then we also select the RFs and MC files looking at the nodes available
     dict_dchecks, dict_nodes = lstpipeline.add_mc_and_rfs_nodes(dict_dchecks, root_rfs, root_mcs, dict_source)
-
+    
     ##########################################
     # Then calculating the interpolated values
     for run_number in total_runs:
@@ -789,7 +808,8 @@ def main_final(input_str, simulate_data=False):
     # First calculus
     # Extracting the run number from the input string
     run_number   = int(input_str.split("_")[0])
-    srun_numbers = [int(s) for s in input_str.split("_")[1:]]
+    fist_last_srun = [int(s) for s in input_str.split("_")[1:]]
+    srun_numbers = np.arange(fist_last_srun[0], fist_last_srun[1] + 1)
     
     # Creating and storing a configuration file for lstchain processes
     configure_lstchain()
@@ -816,16 +836,26 @@ def main_final(input_str, simulate_data=False):
     dict_dchecks = lstpipeline.add_dl1_paths_to_dict(dict_dchecks, root_dl1)
     dict_dchecks = lstpipeline.add_dl1_paths_to_dict(dict_dchecks, root_dl1, dchecking=True)
 
-    tab_dcheck_run = read_table(dict_dchecks[run_number]["dchecks"]["runwise"], "/dl1datacheck/cosmics")
+    dcheck_zd, dcheck_az = [], []
+    dcheck_tstart, dcheck_telapsed = [], []
     
-    # reading the variables
-    dcheck_zd = 90 - np.rad2deg(np.array(tab_dcheck_run["mean_alt_tel"]))
-    dcheck_az = np.rad2deg(np.array(tab_dcheck_run["mean_az_tel"]))
-    dcheck_tstart   = tab_dcheck_run["dragon_time"][0][0]
-    dcheck_telapsed = np.array(tab_dcheck_run["elapsed_time"])
+    for srun in range(len(dict_dchecks[run_number]["dchecks"]["srunwise"])):
+        tab_dcheck_srun = read_table(dict_dchecks[run_number]["dchecks"]["srunwise"][srun], "/dl1datacheck/cosmics")
+        
+        # reading the variables
+        dcheck_zd.append(90 - np.rad2deg(tab_dcheck_srun["mean_alt_tel"]))
+        dcheck_az.append(np.rad2deg(tab_dcheck_srun["mean_az_tel"]))
+        
+        dcheck_tstart.append(tab_dcheck_srun["dragon_time"])
+        dcheck_telapsed.append(tab_dcheck_srun["elapsed_time"])
+    
+    dcheck_zd = np.array(dcheck_zd)
+    dcheck_az = np.array(dcheck_az)
+    dcheck_tstart = np.array(dcheck_tstart)
+    dcheck_telapsed = np.array(dcheck_telapsed)
     
     dict_dchecks[run_number]["time"] = {
-        "tstart"   : dcheck_tstart,            # datetime object
+        "tstart"   : dcheck_tstart[0],            # datetime object
         "telapsed" : np.sum(dcheck_telapsed),  # s
         "srunwise" : {
             "telapsed" : dcheck_telapsed,      # s      
@@ -869,9 +899,11 @@ def main_final(input_str, simulate_data=False):
     ##########################################################
     # Reading the histogram from the datacheck ---------------
     # Opening the corresponding datacheck
-    tab_dcheck_run = tables.open_file(fname_dcheck)
-    dcheck_hist_intensities = np.array(tab_dcheck_run.root.dl1datacheck.cosmics.col("hist_intensity"))
-    tab_dcheck_run.close()
+    dcheck_hist_intensities = []
+    for fname_dcheck_srun in dict_dchecks[run_number]["dchecks"]["srunwise"]:
+        tab_dcheck_srun = tables.open_file(fname_dcheck_srun)
+        dcheck_hist_intensities.append(np.array(tab_dcheck_srun.root.dl1datacheck.cosmics.col("hist_intensity")))
+        tab_dcheck_srun.close()
     
     # Converting from counts to rate per intensity unit (non-binning dependent quantity)
     dcheck_rates       = [] # Array of histogram of rates for each subrun
@@ -924,7 +956,6 @@ def main_final(input_str, simulate_data=False):
         pickle.dump(dict_results, f, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
-    # Extract command-line arguments
     function_name = sys.argv[1]
     
     # Call the appropriate function based on the provided function name
