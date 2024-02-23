@@ -361,8 +361,11 @@ def main_init(input_str, simulate_data=False):
     # Initial configuring and paths creation
     # Extracting the run number from the input string
     run_number   = int(input_str.split("_")[0])
-    fist_last_srun = [int(s) for s in input_str.split("_")[1:]]
-    srun_numbers = np.arange(fist_last_srun[0], fist_last_srun[1] + 1)
+    first_last_srun = [int(s) for s in input_str.split("_")[1:]]
+    if len(first_last_srun) == 1:
+        srun_numbers = np.array(first_last_srun)
+    else:
+        srun_numbers = np.arange(first_last_srun[0], first_last_srun[1] + 1)
     """ Empty dictionary to store all the results of one run."""
     dict_results_empty = { 
         "run": run_number, "filenames": {}, "statistics": {}, "flag_error" : {},
@@ -808,8 +811,11 @@ def main_final(input_str, simulate_data=False):
     # First calculus
     # Extracting the run number from the input string
     run_number   = int(input_str.split("_")[0])
-    fist_last_srun = [int(s) for s in input_str.split("_")[1:]]
-    srun_numbers = np.arange(fist_last_srun[0], fist_last_srun[1] + 1)
+    first_last_srun = [int(s) for s in input_str.split("_")[1:]]
+    if len(first_last_srun) == 1:
+        srun_numbers = np.array(first_last_srun)
+    else:
+        srun_numbers = np.arange(first_last_srun[0], first_last_srun[1] + 1)
     
     # Creating and storing a configuration file for lstchain processes
     configure_lstchain()
