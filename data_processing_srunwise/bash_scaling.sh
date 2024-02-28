@@ -6,7 +6,7 @@ path_objects="/fefs/aswg/workspace/juan.jimenez/cherenkov_transparency_correctio
 path_output="/fefs/aswg/workspace/juan.jimenez/cherenkov_transparency_corrections/data_processing_srunwise/objects/output_slurm/"
 # The python scripts to use
 root_scripts="/fefs/aswg/workspace/juan.jimenez/cherenkov_transparency_corrections/data_processing_srunwise/"
-python_script="$root_scripts""main_script.py"
+python_script="$root_scripts""script_scaling.py"
 
 # Read the run numbers from the input text file
 run_strs=$(cat $file)

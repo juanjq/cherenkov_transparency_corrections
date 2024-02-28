@@ -81,6 +81,8 @@ root_sub_dl1 = root_objects + "sub_dl1/"
 # Directory for the results of the fit of each run
 root_results = root_objects + "results_fits/"
 root_final_results = root_objects + "final_results_fits/"
+# Configuration file for the job launching
+file_job_config = root_objects + "config/job_config_runs.txt"
 
 def configure_lstchain():
     """Creates a file of standard configuration for the lstchain analysis. 
@@ -204,8 +206,15 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
                 command = f"lstchain_dl1ab --input-file {input_fname} --output-file {data_output_fname} --config {config_file}"
                 command = command + f" --no-image --light-scaling {data_scale_factor} --intensity-range {dl1_selected_range}"
                 logger.info(command)
-                subprocess.run(command, shell=True)
 
+                # We add an exception because sometimes can fail...
+                ntries = 3
+                while ntries > 0:
+                    try:
+                        ntries = ntries - 1
+                        subprocess.run(command, shell=True)
+                    except Exception as e:
+                        logger.error(f"FLAG HERE! Failed to run {command} with error: {repr(e)}")
         # ////////////////////////////////////////////////////////////
         # ////////////////////////////////////////////////////////////
         # If is the last step i.e. "final"
@@ -224,7 +233,15 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
                 command = f"lstchain_dl1ab --input-file {input_fname} --output-file {data_output_fname} --config {config_file}"
                 command = command + f" --no-image --light-scaling {data_scale_factor}"
                 logger.info(command)
-                subprocess.run(command, shell=True)
+                
+                # We add an exception because sometimes can fail...
+                ntries = 3
+                while ntries > 0:
+                    try:
+                        ntries = ntries - 1
+                        subprocess.run(command, shell=True)
+                    except Exception as e:
+                        logger.error(f"FLAG HERE! Failed to run {command} with error: {repr(e)}")
     
             # We store this info also in the dictionary in the final case
             dict_results["filenames"][srun] = data_output_fname
@@ -385,7 +402,7 @@ def main_init(input_str, simulate_data=False):
         "final_scaling": {}, "final_scaling_interpolated": {}, "interpolation" : {},
     }
     # Create the paths that do not exist
-    for path in [os.path.dirname(config_file), root_objects, root_results, root_final_results, root_sub_dl1]:
+    for path in [os.path.dirname(config_file), root_data, root_objects, root_results, root_final_results, root_sub_dl1]:
         if not os.path.exists(path):
             os.makedirs(os.path.join(path), exist_ok=True)
     # Creating and storing a configuration file for lstchain processes
@@ -622,7 +639,21 @@ def main_merge():
             # Check if it's a file and delete it
             if os.path.isfile(entry_path):
                 os.remove(entry_path)
-            
+                
+    runs_config_file_str = np.sort(np.unique([int(s.split("_")[0]) for s in np.loadtxt(file_job_config, dtype=str)]))
+    runs_config_file_str = np.array([f"_job_{i}_" for i in runs_config_file_str])
+    tmp_files_results = glob.glob(root_results + "*")
+    for file in tmp_files_results:
+    
+        file_is_in_job = False
+        for string in runs_config_file_str:
+            if string in file:
+                file_is_in_job = True
+        
+        # Then we delete runs not in job config
+        if not file_is_in_job:
+            subprocess.run(f"rm {file}", shell=True)
+        
     ##########################
     # Merging the dictionaries
     # Keep only non-repeated runs
@@ -756,18 +787,23 @@ def main_merge():
     
     ##########################################
     # Then calculating the interpolated values
-    for run_number in total_runs:
+    for ir, run_number in enumerate(total_runs):
     
+        # logger.info(f"Interpolating... {run_number} -{ir / len(total_runs) * 100:.1f}%")
         dict_results = dict_runs[run_number]
     
         x_fit = np.cumsum(dict_dchecks[run_number]["time"]["srunwise"]["telapsed"])
         y_fit = np.array([dict_results["final_scaling"][srun] for srun in np.sort(list(dict_results["final_scaling"].keys()))])
     
+        nan_mask = ~(np.isnan(x_fit) | np.isnan(y_fit))
+        x_fit_masked = x_fit[nan_mask]
+        y_fit_masked = y_fit[nan_mask]
+        
         # Performing the fit
         params, pcov, info, _, _ = curve_fit(
             f     = geom.straight_line,
-            xdata = x_fit,
-            ydata = y_fit,
+            xdata = x_fit_masked,
+            ydata = y_fit_masked,
             p0    = [1, 0],
             full_output = True,
         )
@@ -788,7 +824,6 @@ def main_merge():
             "delta_intercept" : delta_intercept,
         }
         
-        
         # Setting a interpolated scaling factor
         for srun in dict_results["final_scaling"].keys():
             
@@ -803,6 +838,12 @@ def main_merge():
         # Storing the object
         with open(dict_fname, 'wb') as f:
             pickle.dump(dict_results, f, pickle.HIGHEST_PROTOCOL)
+
+    ######################################
+    # Cleaning the temporal results folder
+    for file in glob.glob(root_results + "*"):
+        command = f"rm {file}"
+        subprocess.run(command, shell=True)
 
     
 def main_final(input_str, simulate_data=False):
@@ -820,6 +861,11 @@ def main_final(input_str, simulate_data=False):
     # Creating and storing a configuration file for lstchain processes
     configure_lstchain()
 
+    # Create the paths that do not exist
+    for path in [root_data + f"dl1_scaled/{run_number:05}/"]:
+        if not os.path.exists(path):
+            os.makedirs(os.path.join(path), exist_ok=True)
+        
     ####################
     # Reading datachecks
     # Getting coordinates of source
