@@ -82,7 +82,7 @@ root_sub_dl1 = root_objects + "sub_dl1/"
 root_results = root_objects + "results_fits/"
 root_final_results = root_objects + "final_results_fits/"
 # Configuration file for the job launching
-file_job_config = root_objects + "config/job_config_runs.txt"
+file_job_config = root + "config/job_config_runs.txt"
 
 def configure_lstchain():
     """Creates a file of standard configuration for the lstchain analysis. 
@@ -582,25 +582,40 @@ def main_init(input_str, simulate_data=False):
     )
     
     ###################################################
-    # And finally calculating the final scaling factors 
+    # And finally calculating the final scaling factors
     for srun in srun_numbers:
     
         # Only calculating for the cases with no flag errors:
         if not dict_results["flag_error"][srun]:
+    
             # Now putting all together, upper and half
             points_scaling           = np.array([dict_results["scaled"][key][srun]            for key in ["original", "linear", "upper"]])
             points_light_yield       = np.array([dict_results["light_yield"][key][srun]       for key in ["original", "linear", "upper"]])
-            points_delta_light_yield = np.array([dict_results["delta_light_yield"][key][srun] for key in ["original", "linear", "upper"]]) 
+            points_delta_light_yield = np.array([dict_results["delta_light_yield"][key][srun] for key in ["original", "linear", "upper"]])
             
-            # And fitting to a 2nd degree polynomial
-            pol2_scaling = np.poly1d(np.polyfit(points_scaling, points_light_yield, 2))
-        
-            # And finding the final scaling
-            final_scale_factor = optimize.root(pol2_scaling - 1, x0=linear_scale_factor).x[0]
-        
+            if simulate_data:
+                points_scaling           = np.array([1, 1.2, 1.4])       + np.random.rand(3) * 0.1
+                points_light_yield       = np.array([0.7, 0.9, 1.2])     + np.random.rand(3) * 0.1
+                points_delta_light_yield = np.array([0.05, 0.05, 0.05])  + np.random.rand(3) * 0.01        
+                
+            srun_a, srun_b, srun_c, srun_delta_a, srun_delta_b, srun_delta_c = geom.parabola_3points(
+                *points_scaling, *points_light_yield, *points_delta_light_yield
+            )
+            
+            range_avg_point = np.mean(points_scaling)
+            x0, delta_x0 = geom.get_roots_pol2(
+                range_avg_point, 1,*points_scaling, *points_light_yield, *points_delta_light_yield
+            )
+    
+            final_scale_factor = x0
+            delta_final_scale_factor = delta_x0
+    
         else:
             final_scale_factor = np.nan
+            delta_final_scale_factor = np.nan
+            
         dict_results["final_scaling"][srun] = final_scale_factor
+        dict_results["delta_final_scaling"][srun] = delta_final_scale_factor
     
     ##############################
     # Storing data in a pkl object
@@ -718,12 +733,16 @@ def main_merge():
                 # Case of two invalid subruns in a row
                 if right_neighbor <= last_srun and left_neighbor >= 0:
                     dict_runs[run]["final_scaling"][srun] = (dict_runs[run]["final_scaling"][left_neighbor] + dict_runs[run]["final_scaling"][right_neighbor]) / 2
+                    dict_runs[run]["delta_final_scaling"][srun] = (dict_runs[run]["delta_final_scaling"][left_neighbor] + dict_runs[run]["delta_final_scaling"][right_neighbor]) / 2
                 elif right_neighbor <= last_srun:
                     dict_runs[run]["final_scaling"][srun] = dict_runs[run]["final_scaling"][right_neighbor]
+                    dict_runs[run]["delta_final_scaling"][srun] = dict_runs[run]["delta_final_scaling"][right_neighbor]
                 elif left_neighbor >= 0:
                     dict_runs[run]["final_scaling"][srun] = dict_runs[run]["final_scaling"][left_neighbor]
+                    dict_runs[run]["delta_final_scaling"][srun] = dict_runs[run]["delta_final_scaling"][left_neighbor]
                 else:
                     logger.warning(f"No valid neighbors found for run {run} subrun {srun}. Unable to interpolate.")
+
 
     #######################
     # Reading the datacheck
@@ -794,16 +813,19 @@ def main_merge():
     
         x_fit = np.cumsum(dict_dchecks[run_number]["time"]["srunwise"]["telapsed"])
         y_fit = np.array([dict_results["final_scaling"][srun] for srun in np.sort(list(dict_results["final_scaling"].keys()))])
-    
-        nan_mask = ~(np.isnan(x_fit) | np.isnan(y_fit))
+        yerr_fit = np.array([dict_results["delta_final_scaling"][srun] for srun in np.sort(list(dict_results["final_scaling"].keys()))])
+        
+        nan_mask = ~(np.isnan(x_fit) | np.isnan(y_fit) | np.isnan(yerr_fit))
         x_fit_masked = x_fit[nan_mask]
         y_fit_masked = y_fit[nan_mask]
+        yerr_fit_masked = yerr_fit[nan_mask]
         
         # Performing the fit
         params, pcov, info, _, _ = curve_fit(
             f     = geom.straight_line,
             xdata = x_fit_masked,
             ydata = y_fit_masked,
+            sigma = yerr_fit_masked,
             p0    = [1, 0],
             full_output = True,
         )

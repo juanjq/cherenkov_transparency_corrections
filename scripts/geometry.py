@@ -212,6 +212,86 @@ def pol2(x, a, b, c):
     """
     return a + b * x + c * x * x
 
+def parabola_3points(x1, x2, x3, y1, y2, y3, uy1, uy2, uy3):
+
+    c = y1/(x1*x1 - x1*x2 - x1*x3 + x2*x3) + y2/(-x1*x2 + x1*x3 + x2*x2 - x2*x3) + y3/(x1*x2 - x1*x3 - x2*x3 + x3*x3)
+    b = - (x2*y1)/(x1*x1 - x1*x2 - x1*x3 + x2*x3) - (x3*y1)/(x1*x1 - x1*x2 - x1*x3 + x2*x3) - (x1*y2)/(-x1*x2 + x1*x3 + x2*x2 - x2*x3) - (x3*y2)/(-x1*x2 + x1*x3 + x2*x2 - x2*x3) - (x1*y3)/(x1*x2 - x1*x3 - x2*x3 + x3*x3) - (x2*y3)/(x1*x2 - x1*x3 - x2*x3 + x3*x3)
+    a = (x2*x3*y1)/(x1*x1 - x1*x2 - x1*x3 + x2*x3) + (x1*x3*y2)/(-x1*x2 + x1*x3 + x2*x2 - x2*x3) + (x1*x2*y3)/(x1*x2 - x1*x3 - x2*x3 + x3*x3)
+
+    dcdy1 = 1/((x2-x1)*(x3-x1))
+    dcdy2 = -1/((x2-x1)*(x3-x2))
+    dcdy3 = 1/(x3**2+(-x2-x1)*x3+x1*x2)
+    
+    dbdy1 = -(x3+x2)/((x2-x1)*(x3-x1))
+    dbdy2 = (x3+x1)/((x2-x1)*(x3-x2))
+    dbdy3 = -(x2+x1)/(x3**2+(-x2-x1)*x3+x1*x2)
+
+    dady1 = (x2*x3)/((x2-x1)*(x3-x1))
+    dady2 = -(x1*x3)/((x2-x1)*(x3-x2))
+    dady3 = (x1*x2)/(x3**2+(-x2-x1)*x3+x1*x2)
+    
+    uc = np.sqrt(dcdy1**2 * uy1**2 + dcdy2**2 * uy2**2 + dcdy3**2 * uy3**2)
+    ub = np.sqrt(dbdy1**2 * uy1**2 + dbdy2**2 * uy2**2 + dbdy3**2 * uy3**2)
+    ua = np.sqrt(dady1**2 * uy1**2 + dady2**2 * uy2**2 + dady3**2 * uy3**2)
+    
+    return a, b, c, ua, ub, uc
+
+def get_roots_pol2(xref, yref, x1, x2, x3, y1, y2, y3, uy1, uy2, uy3):
+    
+    yM1, yM2, yM3 = y1 + uy1, y2 + uy2, y3 + uy3 
+    ym1, ym2, ym3 = y1 - uy1, y2 - uy2, y3 - uy3
+
+    a, b, c, ua, ub, uc = parabola_3points(x1, x2, x3, y1, y2, y3, uy1, uy2, uy3)
+    aM, bM, cM, _, _, _ = parabola_3points(x1, x2, x3, yM1, yM2, yM3, uy1, uy2, uy3)
+    am, bm, cm, _, _, _ = parabola_3points(x1, x2, x3, ym1, ym2, ym3, uy1, uy2, uy3)
+    a  = a  - yref
+    aM = aM - yref
+    am = am - yref
+
+    sqr  = (b**2 - 4*a*c)
+    sqrM = (bM**2 - 4*aM*cM)
+    sqrm = (bm**2 - 4*am*cm)
+
+    no_result   = False if sqr  >= 0 else True
+    no_result_M = False if sqrM >= 0 else True
+    no_result_m = False if sqrm >= 0 else True
+    if not no_result:
+        x1  = (-b + sqr**0.5) / (2 * c)
+        x2  = (-b - sqr**0.5) / (2 * c)
+        
+        # dxda = 1/np.sqrt(sqr)
+        # dxdb = b/sqr**(3/2)
+        # dxdc = (6*a*b)/sqr**(5/2)
+        # ux = np.sqrt(dxda**2 * ua**2 + dxdb**2 * ub**2 + dx1dc**2 * uc**2)
+        
+        roots_dist = [abs(x - xref) for x in [x1, x2]]
+        roots_i = roots_dist.index(min(roots_dist))
+        x0 = [x1, x2][roots_i]
+
+    x0M = np.nan
+    if (not no_result) and (not no_result_M):    
+        xM1 = (-bM + sqrM**0.5) / (2 * cM)
+        xM2 = (-bM - sqrM**0.5) / (2 * cM)
+
+        roots_dist = [abs(x - x0) for x in [xM1, xM2]]
+        roots_i = roots_dist.index(min(roots_dist))
+        x0M = [xM1, xM2][roots_i]
+
+    x0m = np.nan
+    if (not no_result) and (not no_result_m):   
+        xm1 = (-bm + sqrm**0.5) / (2 * cm)
+        xm2 = (-bm - sqrm**0.5) / (2 * cm)
+
+        roots_dist = [abs(x - x0) for x in [xm1, xm2]]
+        roots_i = roots_dist.index(min(roots_dist))
+        x0m = [xm1, xm2][roots_i]    
+
+    if no_result:
+        return np.nan, np.nan
+    else:
+        delta_x0 = np.nanmean([np.abs(x0-x0M), np.abs(x0-x0m)])
+        return x0, delta_x0
+
 def angular_dist(az1, az2):
     """
     Calculate the angular distance between two azimuth angles.

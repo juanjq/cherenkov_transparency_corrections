@@ -59,9 +59,9 @@ def configure_lstchain():
     dict_config = {
       "EventSelector": {
         "filters": {
-          "intensity": [80, Infinity],
-          "width": [0, Infinity],
-          "length": [0, Infinity],
+          "intensity": [80, "Infinity"],
+          "width": [0, "Infinity"],
+          "length": [0, "Infinity"],
           "r": [0, 1],
           "wl": [0, 1],
           "leakage_intensity_width_2": [0, 1],
