@@ -65,8 +65,10 @@ p1a, p1b, p1c = -2.89253919, 0.99443581, -0.34013068
 
 # Standard paths for data in the IT cluster ---------
 root_dl1 = "/fefs/aswg/data/real/DL1/*/v0.*/tailcut84/"
-root_rfs = "/fefs/aswg/data/models/AllSky/20230901_v0.10.4_allsky_base_prod/"
-root_mcs = "/fefs/aswg/data/mc/DL2/AllSky/20230901_v0.10.4_allsky_base_prod/TestingDataset/"
+# root_rfs = "/fefs/aswg/data/models/AllSky/20240131_allsky_v0.10.5_all_dec_base/"
+root_rfs = "/fefs/aswg/data/models/AllSky/20230927_v0.10.4_crab_tuned/"
+# root_mcs = "/fefs/aswg/data/mc/DL2/AllSky/20240131_allsky_v0.10.5_all_dec_base/TestingDataset/"
+root_mcs = "/fefs/aswg/data/mc/DL2/AllSky/20230927_v0.10.4_crab_tuned/TestingDataset/"
 
 # Root path of this script
 root = os.getcwd() + "/"
@@ -835,7 +837,7 @@ def main_merge():
         delta_intercept = np.sqrt(pcov[0, 0])
         delta_slope     = np.sqrt(pcov[1, 1])
         _chi2           = np.sum(info['fvec'] ** 2)
-        pvalue          = 1 - chi2.cdf(_chi2, len(x_fit))
+        pvalue          = 1 - chi2.cdf(_chi2, len(x_fit_masked))
         
         dict_results["interpolation"] = {
             "chi2" : _chi2,      

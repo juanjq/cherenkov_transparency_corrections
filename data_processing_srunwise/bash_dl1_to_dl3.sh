@@ -27,12 +27,26 @@ unique_runs=($(printf "%s\n" "${runs[@]}" | sort -u))
 
 for run_str in "${unique_runs[@]}"; do
     # Create a temporary bash script for each run after merge
+    tmp_script_final_scaled="$path_objects""job_dl1_to_dl3_scaled_""$run_str"".sh"
+    tmp_script_final="$path_objects""job_dl1_to_dl3_""$run_str"".sh"
+    echo "#!/bin/bash" > $tmp_script_final_scaled
+    echo "#!/bin/bash" > $tmp_script_final
+    echo "python $python_script '$run_str' 'True'" >> $tmp_script_final_scaled
+    echo "python $python_script '$run_str' 'False'" >> $tmp_script_final
+
+    # Submit the job with dependency on the merge job
+    job_id=$(sbatch -p short --mem=80000 --output="$path_output""slurm_dl1_to_dl3-%j.out" $tmp_script_final | awk '{print $4}')
+    echo "Job for scaled data submitted for run $run_str, with Job ID $job_id"
+
+
+    # Create a temporary bash script for each run after merge
     tmp_script_final="$path_objects""job_dl1_to_dl3_""$run_str"".sh"
     echo "#!/bin/bash" > $tmp_script_final
     echo "python $python_script '$run_str'" >> $tmp_script_final
 
     # Submit the job with dependency on the merge job
     job_id=$(sbatch -p short --mem=80000 --output="$path_output""slurm_dl1_to_dl3-%j.out" $tmp_script_final | awk '{print $4}')
-    echo "Job submitted for run $run_str, with Job ID $job_id"
+    echo "Job for original data submitted for run $run_str, with Job ID $job_id"
+    
 done
 
