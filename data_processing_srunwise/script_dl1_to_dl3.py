@@ -173,68 +173,67 @@ def main(input_str, flag_scaled_str):
 
 
 
-    if flag_scaled:
-        for ir, run in enumerate(dict_dchecks.keys()):
-        
-            dir_run = dir_dl1b_scaled + f"{run:05}" + "/"
-            output_fname = dir_dl1m_scaled + f"dl1_LST-1.Run{run:05}.h5"
-        
+
+    for ir, run in enumerate(dict_dchecks.keys()):
+    
+        dir_run = dir_dl1b_scaled + f"{run:05}" + "/"
+        output_fname = dir_dl1m_scaled + f"dl1_LST-1.Run{run:05}.h5"
+
+        if flag_scaled:
             command = f"lstchain_merge_hdf5_files --input-dir {dir_run} --output-file {output_fname} --run-number {run} --no-image"
             logger.info(command)
             
             subprocess.run(command, shell=True)
-            
-            dict_dchecks[run]["dl1b_scaled"]["runwise"] = output_fname
-
-
-
-
-
-    if flag_scaled:
-        for ir, run in enumerate(dict_dchecks.keys()):
         
-            input_fname  = dict_dchecks[run]["dl1b_scaled"]["runwise"]
-            output_fname = dir_dl2_scaled + input_fname.split("/")[-1].replace("dl1", "dl2", 1)
-            rf_node      = dict_dchecks[run]["simulations"]["rf"]
-        
+        dict_dchecks[run]["dl1b_scaled"]["runwise"] = output_fname
+
+
+
+
+
+    for ir, run in enumerate(dict_dchecks.keys()):
+    
+        input_fname  = dict_dchecks[run]["dl1b_scaled"]["runwise"]
+        output_fname = dir_dl2_scaled + input_fname.split("/")[-1].replace("dl1", "dl2", 1)
+        rf_node      = dict_dchecks[run]["simulations"]["rf"]
+
+        if flag_scaled:
             # Check if the file exists and delete if exists (may be empty or half filled)
             if os.path.exists(output_fname):
                 logger.info(f"File already exists, deleting and re-computing:\n-->{output_fname}")
                 os.remove(output_fname)
-        
+                
             logger.info(f"\nComputing dl2 for Run {run:5} (scaled data)")
             logger.info(f"--> {output_fname}\n")
-        
             command = f"lstchain_dl1_to_dl2 --input-files {input_fname} --path-models {rf_node} --output-dir {dir_dl2_scaled} --config {config_file}"
             logger.info(command)
-        
+            
             subprocess.run(command, shell=True)
-        
-            dict_dchecks[run]["dl2_scaled"] = output_fname
+    
+        dict_dchecks[run]["dl2_scaled"] = output_fname
 
 
 
-    if not flag_scaled:
-        for ir, run in enumerate(dict_dchecks.keys()):
-        
-            input_fname  = dict_dchecks[run]["dl1a"]["runwise"]
-            output_fname = dir_dl2 + input_fname.split("/")[-1].replace("dl1", "dl2", 1)
-            rf_node      = dict_dchecks[run]["simulations"]["rf"]
-        
+    for ir, run in enumerate(dict_dchecks.keys()):
+    
+        input_fname  = dict_dchecks[run]["dl1a"]["runwise"]
+        output_fname = dir_dl2 + input_fname.split("/")[-1].replace("dl1", "dl2", 1)
+        rf_node      = dict_dchecks[run]["simulations"]["rf"]
+
+        if not flag_scaled:
             # Check if the file exists and delete if exists (may be empty or half filled)
             if os.path.exists(output_fname):
                 logger.info(f"File already exists, deleting and re-computing:\n-->{output_fname}")
                 os.remove(output_fname)
-        
+            
             logger.info(f"\nComputing dl2 for Run {run:5} (original data)")
             logger.info(f"--> {output_fname}\n")
-        
             command = f"lstchain_dl1_to_dl2 --input-files {input_fname} --path-models {rf_node} --output-dir {dir_dl2} --config {config_file}"
             logger.info(command)
-        
+            
             subprocess.run(command, shell=True)
         
-            dict_dchecks[run]["dl2"] = output_fname
+        dict_dchecks[run]["dl2"] = output_fname
 
 
 
@@ -272,39 +271,35 @@ def main(input_str, flag_scaled_str):
     ra_str  = "{}".format(dict_source["ra"]).replace(" ", "")
     dec_str = "{}".format(dict_source["dec"]).replace(" ", "")
     
-    if not flag_scaled:
-        for ir, run in enumerate(dict_dchecks.keys()):
-        
-            # dir_run = dir_dl3 + f"{run:05}" + "/"    
-            dl2_fname_scaled = dict_dchecks[run]["dl2_scaled"]
-            
-            output_dl3_scaled = dir_dl3_scaled + f"dl3_LST-1.Run{run:05}.fits"
-            
-            logger.info(f"--> {output_dl3}\n--> {output_dl3_scaled}\n")
-        
-            command = f"lstchain_create_dl3_file --input-dl2 {dl2_fname_scaled} --input-irf-path {dir_irfs} --output-dl3-path {dir_dl3_scaled} "
-            command = command + f"--source-name {source_name} --source-ra {ra_str} --source-dec {dec_str} --config {config_file} --overwrite"
-            logger.info(command)
-            subprocess.run(command, shell=True)
     
-            dict_dchecks[run]["dl3_scaled"] = output_dl3_scaled
-            
-    if not flag_scaled:
-        for ir, run in enumerate(dict_dchecks.keys()):
+    for ir, run in enumerate(dict_dchecks.keys()):
+    
+        # dir_run = dir_dl3 + f"{run:05}" + "/"    
+        dl2_fname = dict_dchecks[run]["dl2"]
+        dl2_fname_scaled = dict_dchecks[run]["dl2_scaled"]
+        output_dl3 = dir_dl3 + f"dl3_LST-1.Run{run:05}.fits"
+        output_dl3_scaled = dir_dl3_scaled + f"dl3_LST-1.Run{run:05}.fits"
         
-            # dir_run = dir_dl3 + f"{run:05}" + "/"    
-            dl2_fname = dict_dchecks[run]["dl2"]
         
-            output_dl3 = dir_dl3 + f"dl3_LST-1.Run{run:05}.fits"
-            
+        if not flag_scaled:
             logger.info(f"\nConverting dl2 for {run:5}")
-            
             command = f"lstchain_create_dl3_file --input-dl2 {dl2_fname} --input-irf-path {dir_irfs} --output-dl3-path {dir_dl3} "
             command = command + f"--source-name {source_name} --source-ra {ra_str} --source-dec {dec_str} --config {config_file} --overwrite"
             logger.info(command)
+            
             subprocess.run(command, shell=True)
-        
-            dict_dchecks[run]["dl3"] = output_dl3
+    
+        if flag_scaled:
+            logger.info(f"--> {output_dl3}\n--> {output_dl3_scaled}\n")
+            command = f"lstchain_create_dl3_file --input-dl2 {dl2_fname_scaled} --input-irf-path {dir_irfs} --output-dl3-path {dir_dl3_scaled} "
+            command = command + f"--source-name {source_name} --source-ra {ra_str} --source-dec {dec_str} --config {config_file} --overwrite"
+            logger.info(command)
+            
+            subprocess.run(command, shell=True)
+            
+        dict_dchecks[run]["dl3"] = output_dl3
+        dict_dchecks[run]["dl3_scaled"] = output_dl3_scaled
+            
 
 
 
@@ -325,4 +320,5 @@ def main(input_str, flag_scaled_str):
 
 if __name__ == "__main__":
     input_str = sys.argv[1]
-    main(input_str)
+    flag_scaled_str = sys.argv[2]
+    main(input_str, flag_scaled_str)
