@@ -12,6 +12,17 @@ python_script="$root_scripts""script_scaling.py"
 run_strs=$(cat $file)
 job_ids=()
 
+##################################################################
+# Step 0: Submitting a job to compute all the IRFs id do not exist
+irfs_script="$path_objects""job_irfs.sh"
+echo "#!/bin/bash" > $irfs_script
+echo "python $python_script 'irfs'" >> $irfs_script
+
+# Submit the irf job
+irf_job_id=$(sbatch -p short --output="$path_output""slurm_irfs-%j.out" $irfs_script | awk '{print $4}')
+echo "IRF job submitted with Job ID $irf_job_id"
+job_ids+=($irf_job_id)
+
 ##################################
 # Step 1: Submit jobs for each run
 for run_str in $run_strs; do

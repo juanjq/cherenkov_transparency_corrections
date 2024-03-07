@@ -51,8 +51,8 @@ dir_dl1b_scaled = root_data + "dl1_scaled/"
 dir_dl1m_scaled = root_data + "dl1_merged_scaled/"
 dir_dl2_scaled  = root_data + "dl2_scaled/"
 dir_dl2         = root_data + "dl2/"
-dir_dl3_scaled_base  = root_data + "dl3_scaled/"
-dir_dl3_base         = root_data + "dl3/"
+dir_dl3_scaled_base = root_data + "dl3_scaled/"
+dir_dl3_base        = root_data + "dl3/"
 dir_irfs        = root_data + "irfs/"
 
 def configure_lstchain():
@@ -149,7 +149,7 @@ def main(input_str, flag_scaled_str):
         },
     }
     # then we also select the RFs and MC files looking at the nodes available
-    dict_dchecks, dict_nodes = lstpipeline.add_mc_and_rfs_nodes(dict_dchecks, root_rfs, root_mcs, dict_source)
+    dict_dchecks = lstpipeline.add_rf_node(dict_dchecks, root_rfs, dict_source)
 
 
 
@@ -194,46 +194,39 @@ def main(input_str, flag_scaled_str):
     for ir, run in enumerate(dict_dchecks.keys()):
     
         input_fname  = dict_dchecks[run]["dl1b_scaled"]["runwise"]
-        output_fname = dir_dl2_scaled + input_fname.split("/")[-1].replace("dl1", "dl2", 1)
+        output_fname        = dir_dl2_scaled + input_fname.split("/")[-1].replace("dl1", "dl2", 1)
+        output_fname_scaled = dir_dl2        + input_fname.split("/")[-1].replace("dl1", "dl2", 1)
         rf_node      = dict_dchecks[run]["simulations"]["rf"]
-
-        if flag_scaled:
-            # Check if the file exists and delete if exists (may be empty or half filled)
-            if os.path.exists(output_fname):
-                logger.info(f"File already exists, deleting and re-computing:\n-->{output_fname}")
-                os.remove(output_fname)
-                
-            logger.info(f"\nComputing dl2 for Run {run:5} (scaled data)")
-            logger.info(f"--> {output_fname}\n")
-            command = f"lstchain_dl1_to_dl2 --input-files {input_fname} --path-models {rf_node} --output-dir {dir_dl2_scaled} --config {config_file}"
-            logger.info(command)
-            
-            subprocess.run(command, shell=True)
     
-        dict_dchecks[run]["dl2_scaled"] = output_fname
-
-
-
-    for ir, run in enumerate(dict_dchecks.keys()):
-    
-        input_fname  = dict_dchecks[run]["dl1a"]["runwise"]
-        output_fname = dir_dl2 + input_fname.split("/")[-1].replace("dl1", "dl2", 1)
-        rf_node      = dict_dchecks[run]["simulations"]["rf"]
-
         if not flag_scaled:
             # Check if the file exists and delete if exists (may be empty or half filled)
             if os.path.exists(output_fname):
                 logger.info(f"File already exists, deleting and re-computing:\n-->{output_fname}")
                 os.remove(output_fname)
             
-            logger.info(f"\nComputing dl2 for Run {run:5} (original data)")
+            logger.info(f"\nComputing dl2 for Run {run:5} (scaled data)")
             logger.info(f"--> {output_fname}\n")
+            command = f"lstchain_dl1_to_dl2 --input-files {input_fname} --path-models {rf_node} "
+            command = command + f"--output-dir {dir_dl2_scaled} --config {config_file}"
+            logger.info(command)
+            
+            subprocess.run(command, shell=True)
+    
+        if flag_scaled:
+            # Check if the file exists and delete if exists (may be empty or half filled)
+            if os.path.exists(output_fname_scaled):
+                logger.info(f"File already exists, deleting and re-computing:\n-->{output_fname_scaled}")
+                os.remove(output_fname_scaled)
+                
+            logger.info(f"\nComputing dl2 for Run {run:5} (original data)")
+            logger.info(f"--> {output_fname_scaled}\n")    
             command = f"lstchain_dl1_to_dl2 --input-files {input_fname} --path-models {rf_node} --output-dir {dir_dl2} --config {config_file}"
             logger.info(command)
             
             subprocess.run(command, shell=True)
-        
+    
         dict_dchecks[run]["dl2"] = output_fname
+        dict_dchecks[run]["dl2_scaled"] = output_fname_scaled
 
 
 

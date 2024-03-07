@@ -154,18 +154,17 @@ def angular_dist(az1, az2):
     angular_distance_abs = abs(az1 - az2)
     return min(angular_distance_abs, 360 - angular_distance_abs)
 
-def add_mc_and_rfs_nodes(DICT, rfs_root, mcs_root, dict_source):
+def add_rf_node(DICT, rfs_root, dict_source):
     """
     Add MC and RF nodes to the given dictionary.
 
     Parameters:
     - DICT (dict): The dictionary to which the MC and RF nodes will be added.
     - rfs_root (str): The root directory of the RF nodes.
-    - mcs_root (str): The root directory of the MC nodes.
     - dict_source (dict): The dictionary containing the source information.
 
     Returns:
-    - tuple: A tuple containing the updated dictionary (DICT) and a dictionary of nodes (dict_nodes).
+    - dictionary: The updated dictionary (DICT) and a dictionary of nodes (dict_nodes).
     """
     
     # finding the RF nodes in DEC
@@ -175,60 +174,13 @@ def add_mc_and_rfs_nodes(DICT, rfs_root, mcs_root, dict_source):
     dist_rfs = np.abs(rf_nodes_dec - dict_source["dec"].value)
     closest_rf_node = rfs_decs[np.argmin(dist_rfs)]
 
-    # and the MC nodes in AZ ZD
-    mcs_decs = os.listdir(mcs_root)
-    mc_nodes_dec = [float(d.split("_")[-1][:-2] + "." + d.split("_")[-1][-2:]) for d in mcs_decs]
-
-    dist_mc_dec = np.abs(mc_nodes_dec - dict_source["dec"].value)
-    closest_mc_dec_node = rfs_decs[np.argmin(dist_mc_dec)]
-
-    nodes = np.array(os.listdir(mcs_root + mcs_decs[0]))
-    zds = np.array([float(n.split("_")[2]) for n in nodes])
-    azs = np.array([float(n.split("_")[4]) for n in nodes])
-
     for run in DICT.keys():
-        _zd = DICT[run]["pointing"]["zd"]
-        _az = DICT[run]["pointing"]["az"]
-
-        dist_mcs_zd = np.abs(zds - _zd)
-
-        zd_closest_node = zds[np.argmin(dist_mcs_zd)]
-
-        mask_zd  = (zds == zd_closest_node)
-        nodes_zd = nodes[mask_zd]
-        zds_zd   = zds[mask_zd]
-        azs_zd   = azs[mask_zd]
-
-        dist_mcs_az = np.array([angular_dist(azs_zd[i], _az) for i in range(len(azs_zd))])
-
-        closest_node = nodes[np.argmin(dist_mcs_az)]
-
-        # now looking inside the folder to find the MC .h5 file
-        mc_fnames = glob.glob(mcs_root + closest_mc_dec_node + "/" + closest_node + "/*.h5")
-        if len(mc_fnames) == 0:
-            sys.exit("ERROR: no MC files found inside {}".format(mcs_root + closest_mc_dec_node + "/" + closest_node))
-        elif len(mc_fnames) > 1:
-            logger.warning("MC path {} presented {} .h5 files:".format(closest_mc_dec_node + "/" + closest_node, len(mc_fnames)))
-            for idf, f in enumerate(mc_fnames):
-                selected = "(SELECTED)" if idf == 0 else ""
-                logger.info(f"--> {f} {selected}")
-
-        mc_fname = mc_fnames[0]
 
         DICT[run]["simulations"] = {
-            "mc" : mc_fname,
             "rf" : rfs_root + closest_rf_node,
         }
 
-    dict_nodes = {
-        "dec" : mc_nodes_dec,
-        "pointing" : {
-            "az" : azs,
-            "zd" : zds,
-        },
-    }
-
-    return DICT, dict_nodes
+    return DICT
 
 def sort_based(x_array, ref_array):
     """

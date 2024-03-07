@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+ import matplotlib.pyplot as plt
 import numpy as np
 import astropy.units as u
 from datetime import datetime
@@ -85,6 +85,15 @@ root_results = root_objects + "results_fits/"
 root_final_results = root_objects + "final_results_fits/"
 # Configuration file for the job launching
 file_job_config = root + "config/job_config_runs.txt"
+
+# Directories for the data
+dir_dl1b_scaled = root_data + "dl1_scaled/"
+dir_dl1m_scaled = root_data + "dl1_merged_scaled/"
+dir_dl2_scaled  = root_data + "dl2_scaled/"
+dir_dl2         = root_data + "dl2/"
+dir_dl3_scaled_base = root_data + "dl3_scaled/"
+dir_dl3_base        = root_data + "dl3/"
+dir_irfs        = root_data + "irfs/"
 
 def configure_lstchain():
     """Creates a file of standard configuration for the lstchain analysis. 
@@ -223,7 +232,7 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
         # The lstchain_dl1ab script is run over all thedataset to generate the final file
         elif iteration_step == "final":
 
-            data_output_fname = root_data + f"dl1_scaled/{run_number:05}/" + os.path.basename(dict_dchecks[run_number]["dl1a"]["srunwise"][srun])
+            data_output_fname = dir_dl1b_scaled + f"{run_number:05}/" + os.path.basename(dict_dchecks[run_number]["dl1a"]["srunwise"][srun])
             logger.info(f"\nProcessing subrun {srun}")
 
             if not simulated:
@@ -373,7 +382,25 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
 
     return dict_results
 
+def main_irf_creation():
 
+    # Computing IRF for each MC file
+    for file_mc in glob.glob(root_mcs + "*/*/*.h5"):
+        # Filename of MC
+        fname_mc  = file_mc.split("/")[-1]
+        # Creating the derived MC filename
+        fname_irf = fname_mc.replace("dl2", "irf").replace(".h5", ".fits.gz")
+        path_irf  = dir_irfs + fname_irf
+    
+        logger.info(f"\nComputing IRF for MC file: {fname_mc}")
+        logger.info(f"--> {fname_irf}\n")
+        
+        command = f"lstchain_create_irf_files --input-gamma-dl2 {file_mc} --output-irf-file {path_irf} --point-like"
+        command = command + f" --energy-dependent-gh --energy-dependent-theta"
+        logger.info(command)
+        subprocess.run(command, shell=True)
+
+    
 def main_init(input_str, simulate_data=False):
 
     ########################################
@@ -466,7 +493,7 @@ def main_init(input_str, simulate_data=False):
         },
     }
     # then we also select the RFs and MC files looking at the nodes available
-    dict_dchecks, dict_nodes = lstpipeline.add_mc_and_rfs_nodes(dict_dchecks, root_rfs, root_mcs, dict_source)
+    dict_dchecks = lstpipeline.add_rf_node(dict_dchecks, root_rfs, dict_source)
     
     
     # Pivot intensity for decorrelation
@@ -624,7 +651,7 @@ def main_init(input_str, simulate_data=False):
     dict_fname = root_results + f"results_job_{input_str}.pkl"
     
     # Saving the objects
-    with open(dict_fname, 'wb') as f:
+    with open(dict_fname, "wb") as f:
         pickle.dump(dict_results, f, pickle.HIGHEST_PROTOCOL)
 
 
@@ -640,7 +667,7 @@ def main_merge():
     for file in dict_files:
     
         # Reading the dictionaries using pickle
-        with open(file, 'rb') as f:
+        with open(file, "rb") as f:
             tmp_dict = pickle.load(f)
     
         total_runs.append(int(file.split("/")[-1].split("_")[2]))
@@ -653,7 +680,7 @@ def main_merge():
         for entry in os.listdir(dir_to_delete):
             entry_path = os.path.join(dir_to_delete, entry)
         
-            # Check if it's a file and delete it
+            # Check if it"s a file and delete it
             if os.path.isfile(entry_path):
                 os.remove(entry_path)
                 
@@ -705,7 +732,7 @@ def main_merge():
 
     #####################
     # Checking statistics
-    # We don't trust the fit for subruns with too few events or in which the fit have not suceeded
+    # We don"t trust the fit for subruns with too few events or in which the fit have not suceeded
     # In tose cases we will apply as the final scaling the average with the neighbors.
     for run in dict_runs.keys():
         # The dictionary of one run
@@ -836,7 +863,7 @@ def main_merge():
         slope           = params[1]
         delta_intercept = np.sqrt(pcov[0, 0])
         delta_slope     = np.sqrt(pcov[1, 1])
-        _chi2           = np.sum(info['fvec'] ** 2)
+        _chi2           = np.sum(info["fvec"] ** 2)
         pvalue          = 1 - chi2.cdf(_chi2, len(x_fit_masked))
         
         dict_results["interpolation"] = {
@@ -860,7 +887,7 @@ def main_merge():
 
         ####################
         # Storing the object
-        with open(dict_fname, 'wb') as f:
+        with open(dict_fname, "wb") as f:
             pickle.dump(dict_results, f, pickle.HIGHEST_PROTOCOL)
 
     ######################################
@@ -946,7 +973,7 @@ def main_final(input_str, simulate_data=False):
         },
     }
     # then we also select the RFs and MC files looking at the nodes available
-    dict_dchecks, dict_nodes = lstpipeline.add_mc_and_rfs_nodes(dict_dchecks, root_rfs, root_mcs, dict_source)
+    dict_dchecks = lstpipeline.add_rf_node(dict_dchecks, root_rfs, dict_source)
 
     # Pivot intensity for decorrelation
     ref_intensity = (limits_intensity[0] * limits_intensity[1]) ** 0.5
@@ -1020,7 +1047,7 @@ def main_final(input_str, simulate_data=False):
     dict_fname = root_final_results + f"results_job_{run_number}.pkl"
     
     # Reading the object
-    with open(dict_fname, 'rb') as f:
+    with open(dict_fname, "rb") as f:
         dict_results = pickle.load(f)
     
     dict_results = find_scaling(
@@ -1028,21 +1055,23 @@ def main_final(input_str, simulate_data=False):
     )
     
     # Saving the object again
-    with open(dict_fname, 'wb') as f:
+    with open(dict_fname, "wb") as f:
         pickle.dump(dict_results, f, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
     function_name = sys.argv[1]
     
     # Call the appropriate function based on the provided function name
-    if function_name == 'init':
+    if function_name == "init":
         input_str = sys.argv[2]
         main_init(input_str)
-    elif function_name == 'merge':
+    elif function_name == "merge":
         main_merge()
-    elif function_name == 'final':
+    elif function_name == "final":
         input_str = sys.argv[2]
         main_final(input_str)
+    elif function_name == "irfs":
+        main_irf_creation()
     else:
         print(f"Unknown function: {function_name}\nOptions: init, merge, final")
         sys.exit(1)
