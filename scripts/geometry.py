@@ -213,7 +213,18 @@ def pol2(x, a, b, c):
     return a + b * x + c * x * x
 
 def parabola_3points(x1, x2, x3, y1, y2, y3, uy1, uy2, uy3):
+    """
+    Calculates the parameters of a parabola that passes trough 3 points, given only the errors in the y-axis.
 
+    Parameters:
+    x1, x2, x3 (3-float): X-coordinates of the three points.
+    y1, y2, y3 (3-float): Y-coordinates of the three points.
+    uy1, uy2, uy3 (3-float): Error in Y-axis.
+
+    Returns:
+    a, b, c (3-float): The parameters of the polynomial.
+    ua, ub, uc (3-float): The error on the parameters of the polynomial.
+    """
     c = y1/(x1*x1 - x1*x2 - x1*x3 + x2*x3) + y2/(-x1*x2 + x1*x3 + x2*x2 - x2*x3) + y3/(x1*x2 - x1*x3 - x2*x3 + x3*x3)
     b = - (x2*y1)/(x1*x1 - x1*x2 - x1*x3 + x2*x3) - (x3*y1)/(x1*x1 - x1*x2 - x1*x3 + x2*x3) - (x1*y2)/(-x1*x2 + x1*x3 + x2*x2 - x2*x3) - (x3*y2)/(-x1*x2 + x1*x3 + x2*x2 - x2*x3) - (x1*y3)/(x1*x2 - x1*x3 - x2*x3 + x3*x3) - (x2*y3)/(x1*x2 - x1*x3 - x2*x3 + x3*x3)
     a = (x2*x3*y1)/(x1*x1 - x1*x2 - x1*x3 + x2*x3) + (x1*x3*y2)/(-x1*x2 + x1*x3 + x2*x2 - x2*x3) + (x1*x2*y3)/(x1*x2 - x1*x3 - x2*x3 + x3*x3)
@@ -237,7 +248,21 @@ def parabola_3points(x1, x2, x3, y1, y2, y3, uy1, uy2, uy3):
     return a, b, c, ua, ub, uc
 
 def get_roots_pol2(xref, yref, x1, x2, x3, y1, y2, y3, uy1, uy2, uy3):
-    
+    """
+    Calculates the roots of a 2 degree polynomial that passes trough 3 points.
+
+    Parameters:
+    xref (float): A center or reference value in x-axis to find the nearest root around.
+    yref (float): A baseline. Setting to 0 will calculate the usual roots, otherwise it 
+    can calculate the roots at a certain y-value, that will be yref.
+    x1, x2, x3 (3-float): X-coordinates of the three points.
+    y1, y2, y3 (3-float): Y-coordinates of the three points.
+    uy1, uy2, uy3 (3-float): Error in Y-axis.
+
+    Returns:
+    x0 (float): The root.
+    delta_x0 (float): Estimated error on the root.
+    """    
     yM1, yM2, yM3 = y1 + uy1, y2 + uy2, y3 + uy3 
     ym1, ym2, ym3 = y1 - uy1, y2 - uy2, y3 - uy3
 
@@ -305,3 +330,4 @@ def angular_dist(az1, az2):
     """
     angular_distance_abs = abs(az1 - az2)
     return min(angular_distance_abs, 360 - angular_distance_abs)
+    
