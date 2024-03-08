@@ -229,38 +229,6 @@ def main(input_str, flag_scaled_str):
         dict_dchecks[run]["dl2_scaled"] = output_fname_scaled
 
 
-
-
-
-    # Already computed IRFs
-    computed_irfs = glob.glob(dir_irfs + "*")
-    
-    for ir, run in enumerate(dict_dchecks.keys()):
-        
-        input_mc = dict_dchecks[run]["simulations"]["mc"]
-    
-        output_irf = dir_irfs + "irf_{}_{}.fits.gz".format(input_mc.split("/")[-3], input_mc.split("/")[-2])
-    
-        # we don't compute the IRF if it has been already done
-        if output_irf not in computed_irfs:
-            
-            logger.info(f"\nComputing IRF for Run {run:5}")
-            logger.info(f"--> {output_irf}\n")
-            
-            command = f"lstchain_create_irf_files --input-gamma-dl2 {input_mc} --output-irf-file {output_irf} --point-like"
-            command = command + f" --energy-dependent-gh --energy-dependent-theta --overwrite"
-            logger.info(command)
-        
-            subprocess.run(command, shell=True)
-        
-        else:
-            logger.info("\nIRF {}_{} already computed\n".format(input_mc.split("/")[-3], input_mc.split("/")[-2]))
-        dict_dchecks[run]["irf"] = output_irf
-
-
-
-
-
     ra_str  = "{}".format(dict_source["ra"]).replace(" ", "")
     dec_str = "{}".format(dict_source["dec"]).replace(" ", "")
     
