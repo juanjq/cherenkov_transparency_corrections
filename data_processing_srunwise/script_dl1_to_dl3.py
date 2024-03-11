@@ -220,8 +220,8 @@ def main(input_str, flag_scaled_str):
                 
             logger.info(f"\nComputing dl2 for Run {run:5} (scaled data)")
             logger.info(f"--> {output_fname_scaled}\n")    
-            command = f"lstchain_dl1_to_dl2 --input-files {input_fname_scaled} --path-models {rf_node}
-            command = command + f--output-dir {dir_dl2_scaled} --config {config_file}"
+            command = f"lstchain_dl1_to_dl2 --input-files {input_fname_scaled} --path-models {rf_node} "
+            command = command + f"--output-dir {dir_dl2_scaled} --config {config_file}"
             logger.info(command)
             
             subprocess.run(command, shell=True)
