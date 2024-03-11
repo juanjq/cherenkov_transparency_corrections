@@ -192,8 +192,8 @@ def main(input_str, flag_scaled_str):
     
     for ir, run in enumerate(dict_dchecks.keys()):
     
-        input_fname         = dict_dchecks[run]["dl1b_scaled"]["runwise"]
-        input_fname_scaled  = dict_dchecks[run]["dl1a"]["runwise"]
+        input_fname         = dict_dchecks[run]["dl1a"]["runwise"]
+        input_fname_scaled  = dict_dchecks[run]["dl1b_scaled"]["runwise"]
         output_fname        = dir_dl2        + input_fname.split("/")[-1].replace("dl1", "dl2", 1)
         output_fname_scaled = dir_dl2_scaled + input_fname_scaled.split("/")[-1].replace("dl1", "dl2", 1)
         rf_node             = dict_dchecks[run]["simulations"]["rf"]
