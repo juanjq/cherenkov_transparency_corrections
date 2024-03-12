@@ -1,24 +1,18 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import astropy.units as u
 from datetime import datetime
-import pickle, json, sys, os, glob
-import pandas as pd
-from scipy.optimize import curve_fit
-from scipy.stats import chi2
-from scipy import optimize
+import sys, os
 import subprocess
 
 from astropy.coordinates import SkyCoord
-from lstchain.io.config  import get_standard_config
-from ctapipe.io          import read_table
+from ctapipe.io import read_table
 import tables
 
 # Other auxiliar scripts
-sys.path.insert(0, os.getcwd() + "/../scripts/")
-import auxiliar as aux
+sys.path.insert(0, os.path.join(os.getcwd(), "../scripts/"))
 import geometry as geom
 import lstpipeline
+import script_utils_scaling as utils
 
 import logging
 logger = logging.getLogger(__name__)
@@ -26,45 +20,75 @@ logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
 
+
 """ Source name in order to just complete the results file, and
 in order to improve run organization."""
 source_name = "crab"
 
+""" Fit parameters
+Chosen limits in intensity (p.e.) for applying the fit i.e. the
+power law will be fitted only with the points within this range."""
+limits_intensity = [316, 562]
+""" For the positive scaling cases (most of them), we need to have a lower 
+limit in intensity. Thi slimit is used for the subset of events that are 
+scaled just to find which is the scaling value. We use a very low limit by
+default 60 p.e. compared to the lower limit of the fit 316 p.e. because in 
+the worst cases we will have a very non-linear scaling that will displace 
+significantly the events intensities."""
+limits_intensity_extended = 60
+
+""" Power law parameters for the reference
+All these parameters are taken from a common analysis of the full dataset
+Where the period of end of 2022 and start 2023 is taken as reference for good 
+runs. Then we take as reference the mean power law parameters in that period.
+p0 is the normalization factor and p1 is the slope."""
+ref_p0 =  1.74 
+ref_p1 = -2.23
+
+""" Threshold in statistics for the last subrun
+The limit in number of events after cleaning that we need to consider the last
+subrun has enough statistics to perform the analysis over it. Otherwise the 
+values of the scaling that will be applied to this last rubrun are the same 
+that are applied to the last last subrun."""
+statistics_threshold = 10000
+
+""" Parameters for the empyrical fits for Zenith Distance corrections
+Are simply two 2 degree polynomials for each variable of the power law."""
+p0a, p0b, p0c = -0.44751321, 3.62502037, -1.43611437
+p1a, p1b, p1c = -2.89253919, 0.99443581, -0.34013068
+
 # Standard paths for data in the IT cluster ---------
 root_dl1 = "/fefs/aswg/data/real/DL1/*/v0.*/tailcut84/"
-# root_rfs = "/fefs/aswg/data/models/AllSky/20240131_allsky_v0.10.5_all_dec_base/"
 root_rfs = "/fefs/aswg/data/models/AllSky/20230927_v0.10.4_crab_tuned/"
-# root_mcs = "/fefs/aswg/data/mc/DL2/AllSky/20240131_allsky_v0.10.5_all_dec_base/TestingDataset/"
 root_mcs = "/fefs/aswg/data/mc/DL2/AllSky/20230927_v0.10.4_crab_tuned/TestingDataset/"
 
 # Root path of this script
-root = os.getcwd() + "/"
+root = os.getcwd()
 # Path to store the configuration file we are going to use
-config_file = root + "config/standard_config.json"
+config_file = os.path.join(root, "config/standard_config.json")
 # Path to store objects
-root_objects = root + f"objects/"
+root_objects = os.path.join(root, f"objects/")
 # Data main directory
-root_data = root + f"../../data/cherenkov_transparency_corrections/{source_name}/"
+root_data = os.path.join(root, f"../../data/cherenkov_transparency_corrections/{source_name}/")
+# Sub-dl1 objects directory
+root_sub_dl1 = os.path.join(root_objects, "sub_dl1/")
+# Directory for the results of the fit of each run
+root_results = os.path.join(root_objects, "results_fits/")
+root_final_results = os.path.join(root_objects, "final_results_fits/")
+# Configuration file for the job launching
+file_job_config = os.path.join(root, "config/job_config_runs.txt")
 
 # Directories for the data
-dir_dl1b_scaled = root_data + "dl1_scaled/"
-dir_dl1m_scaled = root_data + "dl1_merged_scaled/"
-dir_dl2_scaled  = root_data + "dl2_scaled/"
-dir_dl2         = root_data + "dl2/"
-dir_dl3_scaled_base = root_data + "dl3_scaled/"
-dir_dl3_base        = root_data + "dl3/"
-dir_irfs        = root_data + "irfs/"
+dir_dl1b_scaled = os.path.join(root_data, "dl1_scaled/")
+dir_dl1m_scaled = os.path.join(root_data, "dl1_merged_scaled/")
+dir_dl2_scaled = os.path.join(root_data, "dl2_scaled/")
+dir_dl2 = os.path.join(root_data, "dl2/")
+dir_dl3_scaled_base = os.path.join(root_data, "dl3_scaled/")
+dir_dl3_base = os.path.join(root_data, "dl3/")
+dir_irfs = os.path.join(root_data, "irfs/")
 
-def configure_lstchain():
-    """Creates a file of standard configuration for the lstchain analysis. 
-    It can be changed inside this function"""
-    dict_config = get_standard_config()
-    # We select the heuristic flatfield option in the standard configuration
-    dict_config["source_config"]["LSTEventSource"]["use_flatfield_heuristic"] = True
-    with open(config_file, "w") as json_file:
-        json.dump(dict_config, json_file)
 
-def main(input_str, flag_scaled_str):
+def main(input_str, flag_scaled_str, simulated=False):
 
     # Run numbers to analyze, in our case only one
     run_number = int(input_str)
@@ -80,16 +104,15 @@ def main(input_str, flag_scaled_str):
     # Number of subruns to analyze per run
     subruns_num = None  # Specify the number of subruns you want to analyze, set subruns_num = None to analyze all subruns
 
-    dir_dl3_scaled = dir_dl3_scaled_base + f"{run_number:05}/"
-    dir_dl3        = dir_dl3_base        + f"{run_number:05}/"
+    dir_dl3        = os.path.join(dir_dl3_base, f"{run_number:05}")
+    dir_dl3_scaled = os.path.join(dir_dl3_scaled_base, f"{run_number:05}")
 
     # Creating the directories in case they don't exist
     for path in [os.path.dirname(config_file), dir_dl1b_scaled, dir_dl1m_scaled, dir_dl2, dir_dl2_scaled, dir_dl3_scaled, dir_dl3, dir_irfs]:
-        if not os.path.exists(path):
-            os.makedirs(os.path.join(path), exist_ok=True)
+        os.makedirs(os.path.join(path), exist_ok=True)
     
     # Creating and storing a configuration file for lstchain processes
-    configure_lstchain()
+    utils.configure_lstchain(config_file)
 
 
 
@@ -134,7 +157,7 @@ def main(input_str, flag_scaled_str):
     dcheck_telapsed = np.array(dcheck_telapsed)
     
     dict_dchecks[run_number]["time"] = {
-        "tstart"   : dcheck_tstart[0],            # datetime object
+        "tstart"   : dcheck_tstart[0],         # datetime object
         "telapsed" : np.sum(dcheck_telapsed),  # s
         "srunwise" : {
             "telapsed" : dcheck_telapsed,      # s      
@@ -156,7 +179,7 @@ def main(input_str, flag_scaled_str):
 
     for ir, run in enumerate(dict_dchecks.keys()):
     
-        dir_run = dir_dl1b_scaled + f"{run:05}" + "/"
+        dir_run = os.path.join(dir_dl1b_scaled, f"{run:05}")
         
         sruns = [int(path.split(".")[-2]) for path in dict_dchecks[run]["dl1a"]["srunwise"]]
         
@@ -165,7 +188,7 @@ def main(input_str, flag_scaled_str):
         for i, srun in enumerate(sruns[:subruns_num]):
     
             input_fname  = dict_dchecks[run]["dl1a"]["srunwise"][i]
-            output_fname = dir_run + f"dl1_LST-1.Run{run:05}.{srun:04}.h5"
+            output_fname = os.path.join(dir_run, f"dl1_LST-1.Run{run:05}.{srun:04}.h5")
     
             dict_dchecks[run]["dl1b_scaled"]["srunwise"].append(output_fname)
 
@@ -173,17 +196,20 @@ def main(input_str, flag_scaled_str):
 
 
 
-
     for ir, run in enumerate(dict_dchecks.keys()):
     
-        dir_run = dir_dl1b_scaled + f"{run:05}" + "/"
-        output_fname = dir_dl1m_scaled + f"dl1_LST-1.Run{run:05}.h5"
-
-        if flag_scaled:
-            command = f"lstchain_merge_hdf5_files --input-dir {dir_run} --output-file {output_fname} --run-number {run} --no-image"
-            logger.info(command)
+        dir_run = os.path.join(dir_dl1b_scaled, f"{run:05}")
+        output_fname = os.path.join(dir_dl1m_scaled, f"dl1_LST-1.Run{run:05}.h5")
+    
+        if (not simulated) and (flag_scaled):
+            if os.path.exists(output_fname):
+                logger.info(f"File already exists, deleting and re-computing:\n-->{output_fname}")
+                os.remove(output_fname)
+    
+            command_mergehdf5 = f"lstchain_merge_hdf5_files --input-dir {dir_run} --output-file {output_fname} --no-image"
+            logger.info(command_mergehdf5)
             
-            subprocess.run(command, shell=True)
+            subprocess.run(command_mergehdf5, shell=True)
         
         dict_dchecks[run]["dl1b_scaled"]["runwise"] = output_fname
 
@@ -194,92 +220,73 @@ def main(input_str, flag_scaled_str):
     
         input_fname         = dict_dchecks[run]["dl1a"]["runwise"]
         input_fname_scaled  = dict_dchecks[run]["dl1b_scaled"]["runwise"]
-        output_fname        = dir_dl2        + input_fname.split("/")[-1].replace("dl1", "dl2", 1)
-        output_fname_scaled = dir_dl2_scaled + input_fname_scaled.split("/")[-1].replace("dl1", "dl2", 1)
+        output_fname        = os.path.join(dir_dl2,        os.path.basename(input_fname       ).replace("dl1", "dl2", 1))
+        output_fname_scaled = os.path.join(dir_dl2_scaled, os.path.basename(input_fname_scaled).replace("dl1", "dl2", 1))
         rf_node             = dict_dchecks[run]["simulations"]["rf"]
-    
-        if not flag_scaled:
+
+        # Not scaled case
+        if (not simulated) and (not flag_scaled):
+            _dir_dl2 = dir_dl2
+            _input_fname = input_fname
+            _output_fname = output_fname
+        # Scaled case
+        elif (not simulated) and (flag_scaled):
+            _dir_dl2 = dir_dl2_scaled
+            _input_fname = input_fname
+            _output_fname = output_fname_scaled
+
+        if (not simulated):
             # Check if the file exists and delete if exists (may be empty or half filled)
-            if os.path.exists(output_fname):
-                logger.info(f"File already exists, deleting and re-computing:\n-->{output_fname}")
-                os.remove(output_fname)
-            
-            logger.info(f"\nComputing dl2 for Run {run:5} (original data)")
-            logger.info(f"--> {output_fname}\n")
-            command = f"lstchain_dl1_to_dl2 --input-files {input_fname} --path-models {rf_node} "
-            command = command + f"--output-dir {dir_dl2} --config {config_file}"
-            logger.info(command)
-            
-            subprocess.run(command, shell=True)
-    
-        if flag_scaled:
-            # Check if the file exists and delete if exists (may be empty or half filled)
-            if os.path.exists(output_fname_scaled):
-                logger.info(f"File already exists, deleting and re-computing:\n-->{output_fname_scaled}")
-                os.remove(output_fname_scaled)
+            if os.path.exists(_output_fname):
+                logger.info(f"File already exists, deleting and re-computing:\n-->{_output_fname}")
+                os.remove(_output_fname)
                 
-            logger.info(f"\nComputing dl2 for Run {run:5} (scaled data)")
-            logger.info(f"--> {output_fname_scaled}\n")    
-            command = f"lstchain_dl1_to_dl2 --input-files {input_fname_scaled} --path-models {rf_node} "
-            command = command + f"--output-dir {dir_dl2_scaled} --config {config_file}"
-            logger.info(command)
+            logger.info(f"\nComputing dl2 for Run {run:5} (Scaled={str(flag_scaled)})")
+            logger.info(f"--> {_output_fname}\n")
+            command_dl1dl2 = f"lstchain_dl1_to_dl2 --input-files {_input_fname} --path-models {rf_node} "
+            command_dl1dl2 = command_dl1dl2 + f"--output-dir {_dir_dl2} --config {config_file}"
+            logger.info(command_dl1dl2)
             
-            subprocess.run(command, shell=True)
+            subprocess.run(command_dl1dl2, shell=True)
     
         dict_dchecks[run]["dl2"] = output_fname
         dict_dchecks[run]["dl2_scaled"] = output_fname_scaled
-
-
-
-
+        
     
     ra_str  = "{}".format(dict_source["ra"]).replace(" ", "")
     dec_str = "{}".format(dict_source["dec"]).replace(" ", "")
     
     
     for ir, run in enumerate(dict_dchecks.keys()):
-    
-        # dir_run = dir_dl3 + f"{run:05}" + "/"    
-        dl2_fname = dict_dchecks[run]["dl2"]
-        dl2_fname_scaled = dict_dchecks[run]["dl2_scaled"]
-        output_dl3 = dir_dl3 + f"dl3_LST-1.Run{run:05}.fits"
-        output_dl3_scaled = dir_dl3_scaled + f"dl3_LST-1.Run{run:05}.fits"
+     
+        dl2_fname         = dict_dchecks[run]["dl2"]
+        dl2_fname_scaled  = dict_dchecks[run]["dl2_scaled"]
+        output_dl3        = os.path.join(dir_dl3,        f"dl3_LST-1.Run{run:05}.fits")
+        output_dl3_scaled = os.path.join(dir_dl3_scaled, f"dl3_LST-1.Run{run:05}.fits")
         
         
-        if not flag_scaled:
+        # Not scaled case
+        if (not simulated) and (not flag_scaled):
             logger.info(f"\nConverting dl2 for {run:5}")
-            command = f"lstchain_create_dl3_file --input-dl2 {dl2_fname} --input-irf-path {dir_irfs} --output-dl3-path {dir_dl3} "
-            command = command + f"--source-name {source_name} --source-ra {ra_str} --source-dec {dec_str} --config {config_file} --overwrite"
-            logger.info(command)
+            command_dl3 = f"lstchain_create_dl3_file --input-dl2 {dl2_fname} --input-irf-path {dir_irfs} "
+            command_dl3 = command_dl3 + f"--output-dl3-path {dir_dl3}--source-name {source_name} --source-ra {ra_str} "
+            command_dl3 = command_dl3 + f"--source-dec {dec_str} --config {config_file} --overwrite"
+            logger.info(command_dl3)
             
-            subprocess.run(command, shell=True)
+            subprocess.run(command_dl3, shell=True)
     
-        if flag_scaled:
+        # Scaled case
+        elif (not simulated) and (flag_scaled):
             logger.info(f"--> {output_dl3}\n--> {output_dl3_scaled}\n")
-            command = f"lstchain_create_dl3_file --input-dl2 {dl2_fname_scaled} --input-irf-path {dir_irfs} --output-dl3-path {dir_dl3_scaled} "
-            command = command + f"--source-name {source_name} --source-ra {ra_str} --source-dec {dec_str} --config {config_file} --overwrite"
-            logger.info(command)
+            command_dl3 = f"lstchain_create_dl3_file --input-dl2 {dl2_fname_scaled} --input-irf-path {dir_irfs} "
+            command_dl3 = command_dl3 + f"--output-dl3-path {dir_dl3_scaled} --source-name {source_name} --source-ra {ra_str} "
+            command_dl3 = command_dl3 + f"--source-dec {dec_str} --config {config_file} --overwrite"
+            logger.info(command_dl3)
             
-            subprocess.run(command, shell=True)
+            subprocess.run(command_dl3, shell=True)
             
         dict_dchecks[run]["dl3"] = output_dl3
         dict_dchecks[run]["dl3_scaled"] = output_dl3_scaled
-            
-
-
-
-    # logger.info(f"All dl3 files created 100%\n\n\nCreating index files...")
-    
-    # command = f"lstchain_create_dl3_index_files --input-dl3-dir {dir_dl3} --overwrite"
-    # logger.info(command)
-    # subprocess.run(command, shell=True)
-    
-    # command = f"lstchain_create_dl3_index_files --input-dl3-dir {dir_dl3_scaled} --overwrite"
-    # logger.info(command)
-    # subprocess.run(command, shell=True)
-    
-    # logger.info(f"\nFinished with the dl3 process")
-
 
 
 

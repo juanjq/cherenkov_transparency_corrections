@@ -1,4 +1,4 @@
- import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 import astropy.units as u
 from datetime import datetime
@@ -6,20 +6,18 @@ import pickle, json, sys, os, glob
 import pandas as pd
 from scipy.optimize import curve_fit
 from scipy.stats import chi2
-from scipy import optimize
 import subprocess
 
-from traitlets.config.loader import Config
-from astropy.coordinates     import SkyCoord
-from lstchain.io.config      import get_standard_config
-from ctapipe.io              import read_table
+from astropy.coordinates import SkyCoord
+from lstchain.io.config  import get_standard_config
+from ctapipe.io          import read_table
 import tables
 
 # Other auxiliar scripts
-sys.path.insert(0, os.getcwd() + "/../scripts/")
-import auxiliar as aux
+sys.path.insert(0, os.path.join(os.getcwd(), "../scripts/"))
 import geometry as geom
 import lstpipeline
+import script_utils_scaling as utils
 
 import logging
 logger = logging.getLogger(__name__)
@@ -65,340 +63,57 @@ p1a, p1b, p1c = -2.89253919, 0.99443581, -0.34013068
 
 # Standard paths for data in the IT cluster ---------
 root_dl1 = "/fefs/aswg/data/real/DL1/*/v0.*/tailcut84/"
-# root_rfs = "/fefs/aswg/data/models/AllSky/20240131_allsky_v0.10.5_all_dec_base/"
 root_rfs = "/fefs/aswg/data/models/AllSky/20230927_v0.10.4_crab_tuned/"
-# root_mcs = "/fefs/aswg/data/mc/DL2/AllSky/20240131_allsky_v0.10.5_all_dec_base/TestingDataset/"
 root_mcs = "/fefs/aswg/data/mc/DL2/AllSky/20230927_v0.10.4_crab_tuned/TestingDataset/"
 
 # Root path of this script
-root = os.getcwd() + "/"
+root = os.getcwd()
 # Path to store the configuration file we are going to use
-config_file = root + "config/standard_config.json"
+config_file = os.path.join(root, "config/standard_config.json")
 # Path to store objects
-root_objects = root + f"objects/"
+root_objects = os.path.join(root, f"objects/")
 # Data main directory
-root_data = root + f"../../data/cherenkov_transparency_corrections/{source_name}/"
+root_data = os.path.join(root, f"../../data/cherenkov_transparency_corrections/{source_name}/")
 # Sub-dl1 objects directory
-root_sub_dl1 = root_objects + "sub_dl1/"
+root_sub_dl1 = os.path.join(root_objects, "sub_dl1/")
 # Directory for the results of the fit of each run
-root_results = root_objects + "results_fits/"
-root_final_results = root_objects + "final_results_fits/"
+root_results = os.path.join(root_objects, "results_fits/")
+root_final_results = os.path.join(root_objects, "final_results_fits/")
 # Configuration file for the job launching
-file_job_config = root + "config/job_config_runs.txt"
+file_job_config = os.path.join(root, "config/job_config_runs.txt")
 
 # Directories for the data
-dir_dl1b_scaled = root_data + "dl1_scaled/"
-dir_dl1m_scaled = root_data + "dl1_merged_scaled/"
-dir_dl2_scaled  = root_data + "dl2_scaled/"
-dir_dl2         = root_data + "dl2/"
-dir_dl3_scaled_base = root_data + "dl3_scaled/"
-dir_dl3_base        = root_data + "dl3/"
-dir_irfs        = root_data + "irfs/"
-
-def configure_lstchain():
-    """Creates a file of standard configuration for the lstchain analysis. 
-    It can be changed inside this function"""
-    dict_config = get_standard_config()
-    # We select the heuristic flatfield option in the standard configuration
-    dict_config["source_config"]["LSTEventSource"]["use_flatfield_heuristic"] = True
-    with open(config_file, "w") as json_file:
-        json.dump(dict_config, json_file)
-
-def merge_dicts(dict1, dict2):
-    """
-    Recursively merge two dictionaries with nested structures.
-
-    Args:
-    - dict1: First dictionary
-    - dict2: Second dictionary
-
-    Returns:
-    - Merged dictionary
-    """
-    merged = dict1.copy()
-
-    for key, value in dict2.items():
-        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-            # If both values are dictionaries, recursively merge them
-            merged[key] = merge_dicts(merged[key], value)
-        else:
-            # Otherwise, just update or add the key-value pair
-            merged[key] = value
-    return merged
-    
-def find_scaling(iteration_step, dict_results, other_parameters, simulated=False):
-    """
-    A function to perform scaling and evaluating the results. Returning everything in a updated dictionary
-
-    Input:
-    - iteration_step: (str) 
-        The iteration step you are in, that can be "original" for the original data, "upper" for the upper
-        limit on the scale factor, "linear" for the linear intepolation factor and "final" for the final scaling 
-        and results.
-        
-    - dict_results: (dict)
-        Dictionary with the results of the before step.
-        
-    - simulated: (bool)
-        If instead of scaling the data, random data is generated just to fill the values. Short to run tests.
-
-    - other_parameters (dict)
-        A dictionary with all other needed parameters:
-        * "srun_numbers"
-        * "dict_dchecks"
-        * "ref_intensity"
-        * "dcheck_intensity_binning"
-        * "dcheck_intensity_binning_widths"
-        * "dcheck_intensity_binning_centers"
-        * "mask_dcheck_bins_fit"
-        * "corr_factor_p0"
-        * "corr_factor_p1"
-    """
-
-    # Reading the other variables dictionary
-    srun_numbers = other_parameters["srun_numbers"]
-    dict_dchecks = other_parameters["dict_dchecks"]
-    ref_intensity = other_parameters["ref_intensity"]
-    dcheck_intensity_binning = other_parameters["dcheck_intensity_binning"]
-    dcheck_intensity_binning_widths = other_parameters["dcheck_intensity_binning_widths"]
-    dcheck_intensity_binning_centers = other_parameters["dcheck_intensity_binning_centers"]
-    mask_dcheck_bins_fit = other_parameters["mask_dcheck_bins_fit"]
-    corr_factor_p0 = other_parameters["corr_factor_p0"]
-    corr_factor_p1 = other_parameters["corr_factor_p1"]
-    
-    # Creating a arrray of subruns looking at the datachecks and also extracting the run number
-    run_number  = dict_results["run"]
-
-    # Empty arrays to store the fit information
-    data_p0, data_delta_p0 = [], []
-    data_p1, data_delta_p1 = [], []
-    data_chi2, data_pvalue = [], []
-    
-    # Processing subrun by subrun---------------------------------------------------------------
-    for srun in srun_numbers:    
-
-        # Reading dl1
-        #################################################
-        input_fname = dict_dchecks[run_number]["dl1a"]["srunwise"][srun]   # Input dl1a 
-        data_scale_factor = dict_results["scaled"][iteration_step][srun]   # Reading the scaling factor
-
-        # Here we do different things depending on the iteration step
-        # ////////////////////////////////////////////////////////////
-        # ////////////////////////////////////////////////////////////
-        # If is the first one i.e. == "original"
-        # We do not run lstchain_dl1ab because the data is already scaled
-        if iteration_step == "original":
-            data_output_fname = input_fname
-
-        # ////////////////////////////////////////////////////////////
-        # ////////////////////////////////////////////////////////////
-        # If is the second or third: "upper" or "linear"
-        # We perform lstchain_dl1ab but over a subset of the data only to keep it shorter
-        elif iteration_step in ["upper", "linear"]:
-
-            # Temporal dl1 file that will be overwritten in the next iteration / subrun
-            data_output_fname = root_sub_dl1 + f"tmp_dl1_srunwise_run{run_number}_srun{srun}_{iteration_step}_scaled.h5" 
-
-            logger.info(f"\nProcessing subrun {srun}")
-
-            # If scale is greater than 1 we select a range lower than the upper one
-            # otherwise we select a range higher than the upper one
-            if data_scale_factor > 1:
-                dl1_selected_range = f"{limits_intensity_extended:.2f},{limits_intensity[1]:.2f}"
-            else:
-                dl1_selected_range = f"{limits_intensity[0]:.2f},inf"
-
-            if not simulated:
-                logger.info(f"Running lstchain_dl1ab... scale: {data_scale_factor:.2f}")
-                # If the file already exists we delete it
-                if os.path.exists(data_output_fname):
-                    os.remove(data_output_fname)
-            
-                command = f"lstchain_dl1ab --input-file {input_fname} --output-file {data_output_fname} --config {config_file}"
-                command = command + f" --no-image --light-scaling {data_scale_factor} --intensity-range {dl1_selected_range}"
-                logger.info(command)
-
-                # We add an exception because sometimes can fail...
-                ntries = 3
-                while ntries > 0:
-                    try:
-                        ntries = ntries - 1
-                        subprocess.run(command, shell=True)
-                    except Exception as e:
-                        logger.error(f"FLAG HERE! Failed to run {command} with error: {repr(e)}")
-        # ////////////////////////////////////////////////////////////
-        # ////////////////////////////////////////////////////////////
-        # If is the last step i.e. "final"
-        # The lstchain_dl1ab script is run over all thedataset to generate the final file
-        elif iteration_step == "final":
-
-            data_output_fname = dir_dl1b_scaled + f"{run_number:05}/" + os.path.basename(dict_dchecks[run_number]["dl1a"]["srunwise"][srun])
-            logger.info(f"\nProcessing subrun {srun}")
-
-            if not simulated:
-                logger.info(f"Running lstchain_dl1ab... scale: {data_scale_factor:.2f}")
-                # If the file already exists we delete it
-                if os.path.exists(data_output_fname):
-                    os.remove(data_output_fname)
-            
-                command = f"lstchain_dl1ab --input-file {input_fname} --output-file {data_output_fname} --config {config_file}"
-                command = command + f" --no-image --light-scaling {data_scale_factor}"
-                logger.info(command)
-                
-                # We add an exception because sometimes can fail...
-                ntries = 3
-                while ntries > 0:
-                    try:
-                        ntries = ntries - 1
-                        subprocess.run(command, shell=True)
-                    except Exception as e:
-                        logger.error(f"FLAG HERE! Failed to run {command} with error: {repr(e)}")
-    
-            # We store this info also in the dictionary in the final case
-            dict_results["filenames"][srun] = data_output_fname
-
-        #################################################################
-        # Reading the dl1 file
-        #################################################################
-        if not simulated:
-            table_data = tables.open_file(data_output_fname)
-            data_counts_intensity, _ = np.histogram(
-                table_data.root.dl1.event.telescope.parameters.LST_LSTCam.col("intensity"), 
-                bins=dcheck_intensity_binning
-            )
-            table_data.close()
-        else:
-            # Simulated example data where we add random noise
-            simdata = [0,0,2,6,12,23,20,15,25,56,105,214,441,694,933,1244,1429,1582,1597,1545,1498,1479,1484,1364,1296,1290,
-                       1228,1089,1004,834,732,665,613,529,411,426,307,266,201,191,186,150,114,121,93,87,62,60,38,39,27,31,33,
-                       26,22,24,20,13,11,11,8,6,5,8,4,4,5,4,3,1,1,2,1,0,1,1,1,1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-            simdata = np.array(simdata)
-            if iteration_step == "original":
-                data_counts_intensity = simdata + np.random.rand(100) * 100
-            elif iteration_step == "upper":
-                data_counts_intensity = simdata * 0.30 + np.random.rand(100) * 100
-            elif iteration_step == "linear":
-                data_counts_intensity = simdata * 0.15 + np.random.rand(100) * 100
-            elif iteration_step == "final":
-                data_counts_intensity = simdata * 0.18 + np.random.rand(100) * 100
-        
-        # Calculating the non binning dependent transformation
-        effective_time_srun = dict_dchecks[run_number]["time"]["srunwise"]["telapsed"][srun]
-        data_rates       = np.array(data_counts_intensity) / effective_time_srun / dcheck_intensity_binning_widths
-        data_delta_rates = np.sqrt(data_counts_intensity)  / effective_time_srun / dcheck_intensity_binning_widths
+dir_dl1b_scaled = os.path.join(root_data, "dl1_scaled/")
+dir_dl1m_scaled = os.path.join(root_data, "dl1_merged_scaled/")
+dir_dl2_scaled = os.path.join(root_data, "dl2_scaled/")
+dir_dl2 = os.path.join(root_data, "dl2/")
+dir_dl3_scaled_base = os.path.join(root_data, "dl3_scaled/")
+dir_dl3_base = os.path.join(root_data, "dl3/")
+dir_irfs = os.path.join(root_data, "irfs/")
 
 
-        #################################################################
-        # Performing the fit
-        #################################################################
-        # Displacing the X-coordinates to the center of the fit, in order to decorrelate the fit
-        x_fit = dcheck_intensity_binning_centers[mask_dcheck_bins_fit] / ref_intensity
-        y_fit = data_rates[mask_dcheck_bins_fit]
-        yerr_fit = data_delta_rates[mask_dcheck_bins_fit]
-        
-        # Trying for the cases where the data is bad and the fit returns an error
-        try:
-            params, pcov, info, _, _ = curve_fit(
-                f     = geom.powerlaw,
-                xdata = x_fit,
-                ydata = y_fit,
-                sigma = yerr_fit,
-                p0    = [ref_p0, ref_p1],
-                full_output = True,
-            )
-        
-            srun_p0, srun_p1  = params
-            srun_delta_p0 = np.sqrt(pcov[0, 0])
-            srun_delta_p1 = np.sqrt(pcov[1, 1])
-            srun_chi2     = np.sum(info["fvec"] ** 2)
-            srun_pvalue   = 1 - chi2.cdf(srun_chi2, sum(mask_dcheck_bins_fit))
-            dict_results["flag_error"][srun] = False
-
-        # If the fit is not successful we return nan values
-        except RuntimeError:
-            logger.error(f"For run {run_number} and subrun {srun}, the fit failed due to RuntimeError.")
-            srun_p0, srun_p1  = np.nan, np.nan
-            srun_delta_p0 = np.nan
-            srun_delta_p1 = np.nan
-            srun_chi2     = np.nan
-            srun_pvalue   = np.nan
-            dict_results["flag_error"][srun] = True
-            
-        dict_results["chi2"][iteration_step][srun]   = srun_chi2
-        dict_results["pvalue"][iteration_step][srun] = srun_pvalue
-        dict_results["scaled"][iteration_step][srun] = data_scale_factor
-    
-        data_p0.append(srun_p0)
-        data_p1.append(srun_p1)
-        data_delta_p0.append(srun_delta_p0)
-        data_delta_p1.append(srun_delta_p1)
-        data_chi2.append(srun_chi2)
-        data_pvalue.append(srun_pvalue)
-    
-    # Convert to numpy arrays
-    data_p0       = np.array(data_p0)
-    data_p1       = np.array(data_p1)
-    data_delta_p0 = np.array(data_delta_p0)
-    data_delta_p1 = np.array(data_delta_p1)
-    data_chi2     = np.array(data_chi2)
-    data_pvalue   = np.array(data_pvalue)
-  
-    # Zenith corrections to the parameters
-    #########################################################
-    data_corr_p0 = data_p0 * corr_factor_p0
-    data_corr_p1 = data_p1 + corr_factor_p1
-    
-    data_corr_delta_p0 = data_delta_p0 * corr_factor_p0
-    data_corr_delta_p1 = data_delta_p1
-    
-    # Calculating the needed light yield  
-    data_light_yield, data_delta_light_yield = geom.calc_light_yield(
-        p0_fit = data_corr_p0,
-        p1_fit = data_corr_p1, 
-        sigma_p0_fit = data_corr_delta_p0, 
-        sigma_p1_fit = data_corr_delta_p1, 
-        p0_ref = ref_p0,
-    )
-    # Scalings to apply
-    data_scaling       = 1 / data_light_yield
-    data_delta_scaling = 1 / data_light_yield ** 4 * data_delta_light_yield
-    # The scaling in percentage
-    data_scaling_percent       = (data_scaling - 1) * 100
-    data_delta_scaling_percent = data_delta_scaling * 100
-    
-    # Adding to dictionary
-    for i, srun in enumerate(srun_numbers):
-        dict_results["p0"][iteration_step][srun]       = data_corr_p0[i]
-        dict_results["delta_p0"][iteration_step][srun] = data_corr_delta_p0[i]
-        dict_results["p1"][iteration_step][srun]       = data_corr_p1[i]
-        dict_results["delta_p1"][iteration_step][srun] = data_corr_delta_p1[i]
-        
-        dict_results["light_yield"][iteration_step][srun]       = data_light_yield[i]
-        dict_results["delta_light_yield"][iteration_step][srun] = data_delta_light_yield[i]
-        dict_results["scaling"][iteration_step][srun]           = data_scaling[i]
-        dict_results["delta_scaling"][iteration_step][srun]     = data_delta_scaling[i]
-        dict_results["scaling_percent"][iteration_step][srun]   = data_scaling_percent[i]
-        dict_results["delta_scaling_percent"][iteration_step][srun] = data_delta_scaling_percent[i]
-
-    return dict_results
 
 def main_irf_creation():
 
+    # Creating configuration file
+    utils.configure_lstchain(config_file)
+    
     # Computing IRF for each MC file
-    for file_mc in glob.glob(root_mcs + "*/*/*.h5"):
+    all_mcs_dl2 = np.sort(glob.glob(os.path.join(root_mcs, "*/*/*.h5")))
+    for file_mc in all_mcs_dl2:
         # Filename of MC
-        fname_mc  = file_mc.split("/")[-1]
+        fname_mc  = os.path.basename(file_mc)
         # Creating the derived MC filename
         fname_irf = fname_mc.replace("dl2", "irf").replace(".h5", ".fits.gz")
-        path_irf  = dir_irfs + fname_irf
+        path_irf  = os.path.join(dir_irfs, fname_irf)
     
         logger.info(f"\nComputing IRF for MC file: {fname_mc}")
         logger.info(f"--> {fname_irf}\n")
         
-        command = f"lstchain_create_irf_files --input-gamma-dl2 {file_mc} --output-irf-file {path_irf} --point-like"
-        command = command + f" --energy-dependent-gh --energy-dependent-theta"
-        logger.info(command)
-        subprocess.run(command, shell=True)
+        command_irfs = f"lstchain_create_irf_files --input-gamma-dl2 {file_mc} --output-irf-file {path_irf} --point-like"
+        command_irfs = command_irfs + f" --energy-dependent-gh --energy-dependent-theta --config {config_file}"
+        logger.info(command_irfs)
+        subprocess.run(command_irfs, shell=True)
 
     
 def main_init(input_str, simulate_data=False):
@@ -428,14 +143,13 @@ def main_init(input_str, simulate_data=False):
         "delta_scaling":     {"original": {}, "upper": {}, "linear": {}, "final": {}},
         "scaling_percent":       {"original": {}, "upper": {}, "linear": {}, "final": {}},
         "delta_scaling_percent": {"original": {}, "upper": {}, "linear": {}, "final": {}},
-        "final_scaling": {}, "final_scaling_interpolated": {}, "interpolation" : {},
+        "final_scaling": {}, "delta_final_scaling": {}, "final_scaling_interpolated": {}, "interpolation" : {},
     }
     # Create the paths that do not exist
     for path in [os.path.dirname(config_file), root_data, root_objects, root_results, root_final_results, root_sub_dl1]:
-        if not os.path.exists(path):
-            os.makedirs(os.path.join(path), exist_ok=True)
+        os.makedirs(os.path.join(path), exist_ok=True)
     # Creating and storing a configuration file for lstchain processes
-    configure_lstchain()
+    utils.configure_lstchain(config_file)
     
     ################################################################
     # Generating a dictionary with the information of all datachecks
@@ -559,10 +273,15 @@ def main_init(input_str, simulate_data=False):
         "dcheck_intensity_binning_widths" : dcheck_intensity_binning_widths,
         "dcheck_intensity_binning_centers" : dcheck_intensity_binning_centers,
         "mask_dcheck_bins_fit" : mask_dcheck_bins_fit,
-        "corr_factor_p0" : corr_factor_p0,
-        "corr_factor_p1" : corr_factor_p1,
+        "corr_factor_p0" : corr_factor_p0, "corr_factor_p1" : corr_factor_p1,
+        "root_sub_dl1" : root_sub_dl1,
+        "dir_dl1b_scaled" : dir_dl1b_scaled,
+        "lims_intensity" : lims_intensity,
+        "lims_intensity_extended" : lims_intensity_extended,
+        "config_file" : config_file,
+        "ref_p0" : ref_p0, "ref_p1" : ref_p1,
     }
-    
+
     #######################
     # Reading original data
     # The main results dictionary
@@ -574,7 +293,7 @@ def main_init(input_str, simulate_data=False):
         dict_results["statistics"][srun] = int(np.sum(dcheck_hist_intensities[srun]))
     
     # Then we read these files and perform the fits
-    dict_results = find_scaling(
+    dict_results = utils.find_scaling(
         iteration_step="original", dict_results=dict_results, other_parameters=other_parameters, simulated=simulate_data
     )
     
@@ -584,7 +303,7 @@ def main_init(input_str, simulate_data=False):
     
     ###################################
     # Then performing the upper scaling
-    dict_results = find_scaling(
+    dict_results = utils.find_scaling(
         iteration_step="upper", dict_results=dict_results, other_parameters=other_parameters, simulated=simulate_data
     )
     
@@ -606,7 +325,7 @@ def main_init(input_str, simulate_data=False):
     
     ##########################################
     # Then applying this linear scaling factor
-    dict_results = find_scaling(
+    dict_results = utils.find_scaling(
         iteration_step="linear", dict_results=dict_results, other_parameters=other_parameters, simulated=simulate_data
     )
     
@@ -648,7 +367,7 @@ def main_init(input_str, simulate_data=False):
     
     ##############################
     # Storing data in a pkl object
-    dict_fname = root_results + f"results_job_{input_str}.pkl"
+    dict_fname = os.path.join(root_results, f"results_job_{input_str}.pkl")
     
     # Saving the objects
     with open(dict_fname, "wb") as f:
@@ -660,7 +379,7 @@ def main_merge():
     #############################################
     #Reading all the information on the directory
     # All the stored dictionaries that are inside the results folder
-    dict_files = np.sort(glob.glob(root_results + "*.pkl"))
+    dict_files = np.sort(glob.glob(os.path.join(root_results, "*.pkl")))
     
     # Storing all the run numbers and all the separate dictionaries
     total_runs, dictionaries = [], []
@@ -670,7 +389,7 @@ def main_merge():
         with open(file, "rb") as f:
             tmp_dict = pickle.load(f)
     
-        total_runs.append(int(file.split("/")[-1].split("_")[2]))
+        total_runs.append(int(os.path.basename(file).split("_")[2]))
         dictionaries.append(tmp_dict)
 
     ##############################################
@@ -686,7 +405,7 @@ def main_merge():
                 
     runs_config_file_str = np.sort(np.unique([int(s.split("_")[0]) for s in np.loadtxt(file_job_config, dtype=str)]))
     runs_config_file_str = np.array([f"_job_{i}_" for i in runs_config_file_str])
-    tmp_files_results = glob.glob(root_results + "*")
+    tmp_files_results = glob.glob(os.path.join(root_results, "*"))
     for file in tmp_files_results:
     
         file_is_in_job = False
@@ -721,14 +440,14 @@ def main_merge():
             "delta_scaling":     {"original": {}, "upper": {}, "linear": {}, "final": {}},
             "scaling_percent":       {"original": {}, "upper": {}, "linear": {}, "final": {}},
             "delta_scaling_percent": {"original": {}, "upper": {}, "linear": {}, "final": {}},
-            "final_scaling": {}, "final_scaling_interpolated": {}, "interpolation" : {},
+            "final_scaling": {}, "delta_final_scaling": {}, "final_scaling_interpolated": {}, "interpolation" : {},
         }
         dict_runs[run] = tmp
         
     # Now we fill this dicts one by one with the empty one
     for d in dictionaries:
         run = d["run"]
-        dict_runs[run] = merge_dicts(dict_runs[run], d)
+        dict_runs[run] = utils.merge_dicts(dict_runs[run], d)
 
     #####################
     # Checking statistics
@@ -868,7 +587,7 @@ def main_merge():
         
         dict_results["interpolation"] = {
             "chi2" : _chi2,      
-            "p_value" : pvalue,         
+            "pvalue" : pvalue,         
             "slope": slope,      
             "delta_slope" : delta_slope,     
             "intercept" : intercept, 
@@ -883,7 +602,7 @@ def main_merge():
             dict_results["final_scaling_interpolated"][srun] = scaling_interpolated
             dict_results["scaled"]["final"][srun]            = scaling_interpolated
     
-        dict_fname = root_final_results + f"results_job_{run_number}.pkl"
+        dict_fname = os.path.join(root_final_results, f"results_job_{run_number}.pkl")
 
         ####################
         # Storing the object
@@ -892,9 +611,9 @@ def main_merge():
 
     ######################################
     # Cleaning the temporal results folder
-    for file in glob.glob(root_results + "*"):
-        command = f"rm {file}"
-        subprocess.run(command, shell=True)
+    for file in glob.glob(os.path.join(root_results, "*")):
+        command_rm = f"rm {file}"
+        subprocess.run(command_rm, shell=True)
 
     
 def main_final(input_str, simulate_data=False):
@@ -910,12 +629,11 @@ def main_final(input_str, simulate_data=False):
         srun_numbers = np.arange(first_last_srun[0], first_last_srun[1] + 1)
     
     # Creating and storing a configuration file for lstchain processes
-    configure_lstchain()
+    utils.configure_lstchain(config_file)
 
     # Create the paths that do not exist
-    for path in [root_data + f"dl1_scaled/{run_number:05}/"]:
-        if not os.path.exists(path):
-            os.makedirs(os.path.join(path), exist_ok=True)
+    for path in [os.path.join(root_data, "dl1_scaled", f"{run_number:05}"]:
+        os.makedirs(os.path.join(path), exist_ok=True)
         
     ####################
     # Reading datachecks
@@ -1038,19 +756,24 @@ def main_final(input_str, simulate_data=False):
         "dcheck_intensity_binning_widths" : dcheck_intensity_binning_widths,
         "dcheck_intensity_binning_centers" : dcheck_intensity_binning_centers,
         "mask_dcheck_bins_fit" : mask_dcheck_bins_fit,
-        "corr_factor_p0" : corr_factor_p0,
-        "corr_factor_p1" : corr_factor_p1,
+        "corr_factor_p0" : corr_factor_p0, "corr_factor_p1" : corr_factor_p1,
+        "root_sub_dl1" : root_sub_dl1,
+        "dir_dl1b_scaled" : dir_dl1b_scaled,
+        "lims_intensity" : lims_intensity,
+        "lims_intensity_extended" : lims_intensity_extended,
+        "config_file" : config_file,
+        "ref_p0" : ref_p0, "ref_p1" : ref_p1,
     }
 
     ##############################################################################################################
     # Scaling the final files and also saving the final results dictionary with all the information o fthe process
-    dict_fname = root_final_results + f"results_job_{run_number}.pkl"
+    dict_fname = os.path.join(root_final_results, f"results_job_{run_number}.pkl")
     
     # Reading the object
     with open(dict_fname, "rb") as f:
         dict_results = pickle.load(f)
     
-    dict_results = find_scaling(
+    dict_results = utils.find_scaling(
         iteration_step="final", dict_results=dict_results, other_parameters=other_parameters, simulated=simulate_data
     )
     
@@ -1073,5 +796,5 @@ if __name__ == "__main__":
     elif function_name == "irfs":
         main_irf_creation()
     else:
-        print(f"Unknown function: {function_name}\nOptions: init, merge, final")
+        print(f"Unknown function: {function_name}\nOptions: irfs, init, merge, final")
         sys.exit(1)
