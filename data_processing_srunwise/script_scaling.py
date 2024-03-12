@@ -798,3 +798,4 @@ if __name__ == "__main__":
     else:
         print(f"Unknown function: {function_name}\nOptions: irfs, init, merge, final")
         sys.exit(1)
+        
