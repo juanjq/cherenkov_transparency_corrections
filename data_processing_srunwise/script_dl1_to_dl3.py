@@ -232,7 +232,7 @@ def main(input_str, flag_scaled_str, simulated=False):
         # Scaled case
         elif (not simulated) and (flag_scaled):
             _dir_dl2 = dir_dl2_scaled
-            _input_fname = input_fname
+            _input_fname = input_fname_scaled
             _output_fname = output_fname_scaled
 
         if (not simulated):
