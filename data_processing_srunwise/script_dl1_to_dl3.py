@@ -268,6 +268,8 @@ def main(input_str, flag_scaled_str, simulated=False):
         # Not scaled case
         if (not simulated) and (not flag_scaled):
             logger.info(f"\nConverting dl2 for {run:5}")
+            logger.info(f"--> {output_dl3}\n")
+            
             command_dl3 = f"lstchain_create_dl3_file --input-dl2 {dl2_fname} --input-irf-path {dir_irfs} "
             command_dl3 = command_dl3 + f"--output-dl3-path {dir_dl3} --source-name {source_name} --source-ra {ra_str} "
             command_dl3 = command_dl3 + f"--source-dec {dec_str} --config {config_file} --overwrite"
@@ -277,7 +279,9 @@ def main(input_str, flag_scaled_str, simulated=False):
     
         # Scaled case
         elif (not simulated) and (flag_scaled):
-            logger.info(f"--> {output_dl3}\n--> {output_dl3_scaled}\n")
+            logger.info(f"\nConverting dl2 for {run:5}")
+            logger.info(f"--> {output_dl3_scaled}\n")
+            
             command_dl3 = f"lstchain_create_dl3_file --input-dl2 {dl2_fname_scaled} --input-irf-path {dir_irfs} "
             command_dl3 = command_dl3 + f"--output-dl3-path {dir_dl3_scaled} --source-name {source_name} --source-ra {ra_str} "
             command_dl3 = command_dl3 + f"--source-dec {dec_str} --config {config_file} --overwrite"

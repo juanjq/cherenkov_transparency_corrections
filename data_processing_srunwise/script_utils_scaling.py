@@ -11,6 +11,11 @@ import tables
 sys.path.insert(0, os.path.join(os.getcwd(), "../scripts/"))
 import geometry as geom
 
+import logging
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.INFO)
+
 def configure_lstchain(config_file):
     """
     Creates a file of standard configuration for the lstchain analysis. 
@@ -133,8 +138,8 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
         * "corr_factor_p1"
         * "root_sub_dl1"
         * "dir_dl1b_scaled"
-        * "lims_intensity"
-        * "lims_intensity_extended"
+        * "limits_intensity"
+        * "limits_intensity_extended"
         * "config_file"
         * "ref_p0"
         * "ref_p1"
@@ -152,8 +157,8 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
     corr_factor_p1 = other_parameters["corr_factor_p1"]
     root_sub_dl1 = other_parameters["root_sub_dl1"]
     dir_dl1b_scaled = other_parameters["dir_dl1b_scaled"]
-    lims_intensity = other_parameters["lims_intensity"]
-    lims_intensity_extended = other_parameters["lims_intensity_extended"]
+    limits_intensity = other_parameters["limits_intensity"]
+    limits_intensity_extended = other_parameters["limits_intensity_extended"]
     config_file = other_parameters["config_file"]
     ref_p0 = other_parameters["ref_p0"]
     ref_p1 = other_parameters["ref_p1"]
@@ -205,11 +210,12 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
                 # If the file already exists we delete it
                 if os.path.exists(data_output_fname):
                     os.remove(data_output_fname)
-            
+                
                 command_dl1ab = f"lstchain_dl1ab --input-file {input_fname} --output-file {data_output_fname} --config {config_file}"
                 command_dl1ab = command_dl1ab + f" --no-image --light-scaling {data_scale_factor} --intensity-range {dl1_selected_range}"
                 logger.info(command_dl1ab)
 
+                subprocess.run(command_dl1ab, shell=True)
                 # # We add an exception because sometimes can fail...
                 # ntries = 3
                 # while ntries > 0:
@@ -233,10 +239,14 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
                 # If the file already exists we delete it
                 if os.path.exists(data_output_fname):
                     os.remove(data_output_fname)
-            
+
+                data_scale_factor = 1.3
+                
                 command_dl1ab = f"lstchain_dl1ab --input-file {input_fname} --output-file {data_output_fname} --config {config_file}"
                 command_dl1ab = command_dl1ab + f" --no-image --light-scaling {data_scale_factor}"
                 logger.info(command_dl1ab)
+
+                subprocess.run(command_dl1ab, shell=True)
                 
                 # # We add an exception because sometimes can fail...
                 # ntries = 3

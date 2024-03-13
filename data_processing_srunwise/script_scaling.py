@@ -83,11 +83,11 @@ root_final_results = os.path.join(root_objects, "final_results_fits/")
 file_job_config = os.path.join(root, "config/job_config_runs.txt")
 
 # Directories for the data
-dir_dl1b_scaled = os.path.join(root_data, "dl1_scaled/")
-dir_dl1m_scaled = os.path.join(root_data, "dl1_merged_scaled/")
-dir_dl2_scaled = os.path.join(root_data, "dl2_scaled/")
+dir_dl1b_scaled = os.path.join(root_data, "dl1_scaled_1.3/")
+dir_dl1m_scaled = os.path.join(root_data, "dl1_merged_scaled_1.3/")
+dir_dl2_scaled = os.path.join(root_data, "dl2_scaled_1.3/")
 dir_dl2 = os.path.join(root_data, "dl2/")
-dir_dl3_scaled_base = os.path.join(root_data, "dl3_scaled/")
+dir_dl3_scaled_base = os.path.join(root_data, "dl3_scaled_1.3/")
 dir_dl3_base = os.path.join(root_data, "dl3/")
 dir_irfs = os.path.join(root_data, "irfs/")
 
@@ -276,8 +276,8 @@ def main_init(input_str, simulate_data=False):
         "corr_factor_p0" : corr_factor_p0, "corr_factor_p1" : corr_factor_p1,
         "root_sub_dl1" : root_sub_dl1,
         "dir_dl1b_scaled" : dir_dl1b_scaled,
-        "lims_intensity" : lims_intensity,
-        "lims_intensity_extended" : lims_intensity_extended,
+        "limits_intensity" : limits_intensity,
+        "limits_intensity_extended" : limits_intensity_extended,
         "config_file" : config_file,
         "ref_p0" : ref_p0, "ref_p1" : ref_p1,
     }
@@ -550,7 +550,7 @@ def main_merge():
         }
     
     # then we also select the RFs and MC files looking at the nodes available
-    dict_dchecks, dict_nodes = lstpipeline.add_mc_and_rfs_nodes(dict_dchecks, root_rfs, root_mcs, dict_source)
+    dict_dchecks, dict_nodes = lstpipeline.add_rf_node(dict_dchecks, root_rfs, root_mcs, dict_source)
     
     ##########################################
     # Then calculating the interpolated values
@@ -632,7 +632,7 @@ def main_final(input_str, simulate_data=False):
     utils.configure_lstchain(config_file)
 
     # Create the paths that do not exist
-    for path in [os.path.join(root_data, "dl1_scaled", f"{run_number:05}"]:
+    for path in [os.path.join(root_data, "dl1_scaled", f"{run_number:05}")]:
         os.makedirs(os.path.join(path), exist_ok=True)
         
     ####################
@@ -759,8 +759,8 @@ def main_final(input_str, simulate_data=False):
         "corr_factor_p0" : corr_factor_p0, "corr_factor_p1" : corr_factor_p1,
         "root_sub_dl1" : root_sub_dl1,
         "dir_dl1b_scaled" : dir_dl1b_scaled,
-        "lims_intensity" : lims_intensity,
-        "lims_intensity_extended" : lims_intensity_extended,
+        "limits_intensity" : limits_intensity,
+        "limits_intensity_extended" : limits_intensity_extended,
         "config_file" : config_file,
         "ref_p0" : ref_p0, "ref_p1" : ref_p1,
     }
