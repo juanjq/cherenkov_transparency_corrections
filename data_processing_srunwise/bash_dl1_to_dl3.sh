@@ -35,9 +35,9 @@ for run_str in "${unique_runs[@]}"; do
     echo "python $python_script '$run_str' 'False'" >> $tmp_script_final
 
     # Submit the job with dependency on the merge job
-    job_id=$(sbatch -p short --mem=80000 --output="$path_output""slurm_dl1_to_dl3_original-%j.out" $tmp_script_final_scaled | awk '{print $4}')
+    job_id=$(sbatch -p short --mem=80000 --output="$path_output""slurm_dl1_to_dl3_scaled-%j.out" $tmp_script_final_scaled | awk '{print $4}')
     echo "Job for scaled data submitted for run $run_str, with Job ID $job_id"
-    job_id=$(sbatch -p short --mem=80000 --output="$path_output""slurm_dl1_to_dl3_scaled-%j.out" $tmp_script_final | awk '{print $4}')
+    job_id=$(sbatch -p short --mem=80000 --output="$path_output""slurm_dl1_to_dl3_original-%j.out" $tmp_script_final | awk '{print $4}')
     echo "Job for original data submitted for run $run_str, with Job ID $job_id"
 
     
