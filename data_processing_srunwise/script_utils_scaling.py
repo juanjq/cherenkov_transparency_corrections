@@ -240,8 +240,6 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
                 if os.path.exists(data_output_fname):
                     os.remove(data_output_fname)
 
-                data_scale_factor = 1.3
-                
                 command_dl1ab = f"lstchain_dl1ab --input-file {input_fname} --output-file {data_output_fname} --config {config_file}"
                 command_dl1ab = command_dl1ab + f" --no-image --light-scaling {data_scale_factor}"
                 logger.info(command_dl1ab)
