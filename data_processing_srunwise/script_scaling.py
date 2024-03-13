@@ -83,11 +83,11 @@ root_final_results = os.path.join(root_objects, "final_results_fits/")
 file_job_config = os.path.join(root, "config/job_config_runs.txt")
 
 # Directories for the data
-dir_dl1b_scaled = os.path.join(root_data, "dl1_scaled_1.3/")
-dir_dl1m_scaled = os.path.join(root_data, "dl1_merged_scaled_1.3/")
-dir_dl2_scaled = os.path.join(root_data, "dl2_scaled_1.3/")
+dir_dl1b_scaled = os.path.join(root_data, "dl1_scaled/")
+dir_dl1m_scaled = os.path.join(root_data, "dl1_merged_scaled/")
+dir_dl2_scaled = os.path.join(root_data, "dl2_scaled/")
 dir_dl2 = os.path.join(root_data, "dl2/")
-dir_dl3_scaled_base = os.path.join(root_data, "dl3_scaled_1.3/")
+dir_dl3_scaled_base = os.path.join(root_data, "dl3_scaled/")
 dir_dl3_base = os.path.join(root_data, "dl3/")
 dir_irfs = os.path.join(root_data, "irfs/")
 
