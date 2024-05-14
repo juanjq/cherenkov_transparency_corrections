@@ -11,3 +11,4 @@
 # Other large files
 **/data/*
 *.h5
+*.pkl
