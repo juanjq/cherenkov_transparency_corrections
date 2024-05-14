@@ -8,6 +8,60 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
+
+def find_run_datacheck(run, dchecking=False):
+    str_dchecks = "" if not dchecking else "datacheck_"
+    dl1_root = "/fefs/aswg/data/real/DL1/*/v0.*/tailcut84/"
+    main_name = f"{str_dchecks}dl1_LST-1.Run?????"
+    total_dl1a_runwise = glob.glob(dl1_root + "*/" + f"{main_name}.h5") + glob.glob(dl1_root + f"{main_name}.h5")
+
+    logger.info(f"\nFinding datacheck for Run {run}...")
+        
+    # Checking for files of this certain run
+    runfiles = []
+    for rf in total_dl1a_runwise:
+        if f"{run:05}" in rf:
+            runfiles.append(rf)
+    
+    # Checking runs we have, not, or we have duplicated
+    if len(runfiles) == 0:
+        raise ValueError(f"Run {run:5} not found in {dl1_root}")
+    
+    elif len(runfiles) > 1:
+        logger.debug(f"Run {run:5} presented {len(runfiles)} files:")
+        versions = []
+        lengths_versions = []
+        for i, runfile in enumerate(runfiles):
+            str_version = runfile.split("/")[7][1:]
+            lengths_versions.append(len(str_version))
+            str_parts = str_version.split(".")
+            str_parts_float = [float(''.join(filter(str.isdigit, str_parts[iii]))) for iii in range(len(str_parts))]
+            for pi, part in enumerate(str_parts_float):
+                if pi == 0:
+                    final_str = f"{part:04.0f}."
+                else:
+                    final_str = final_str + f"{part:04.0f}"                
+            versions.append(float(final_str)) 
+    
+        version_index = 0
+        for i in range(1, len(versions)):
+            if versions[i] > versions[version_index]:
+                version_index = i
+            elif versions[i] == versions[version_index] and lengths_versions[i] < lengths_versions[version_index]:
+                version_index = i
+        
+        for i, runfile in enumerate(runfiles):
+            selected = "(SELECTED)" if i == version_index else ""
+            logger.debug(f"--> {runfile} {selected}")
+    
+        run_path  = runfiles[version_index]
+    
+    else:
+        run_path  = runfiles[0]
+
+    return run_path
+
+
 def add_dl1_paths_to_dict(DICT, dl1_root, dchecking=False):
     """
     Add DL1 file paths to a dictionary.
@@ -48,8 +102,10 @@ def add_dl1_paths_to_dict(DICT, dl1_root, dchecking=False):
         elif len(runfiles) > 1:
             logger.debug(f"Run {run:5} presented {len(runfiles)} files:")
             versions = []
+            lengths_versions = []
             for i, runfile in enumerate(runfiles):
                 str_version = runfile.split("/")[7][1:]
+                lengths_versions.append(len(str_version))
                 str_parts = str_version.split(".")
                 str_parts_float = [float(''.join(filter(str.isdigit, str_parts[iii]))) for iii in range(len(str_parts))]
                 for pi, part in enumerate(str_parts_float):
@@ -58,7 +114,13 @@ def add_dl1_paths_to_dict(DICT, dl1_root, dchecking=False):
                     else:
                         final_str = final_str + f"{part:04.0f}"                
                 versions.append(float(final_str)) 
-            version_index = np.argmax(versions)
+
+            version_index = 0
+            for i in range(1, len(versions)):
+                if versions[i] > versions[version_index]:
+                    version_index = i
+                elif versions[i] == versions[version_index] and lengths_versions[i] < lengths_versions[version_index]:
+                    version_index = i
             
             for i, runfile in enumerate(runfiles):
                 selected = "(SELECTED)" if i == version_index else ""
@@ -103,8 +165,10 @@ def add_dl1_paths_to_dict(DICT, dl1_root, dchecking=False):
                 logger.debug(f"Subrun {subrun:04} presented {len(files)} files:")
 
                 versions = []
+                lengths_versions = []
                 for i, srunfile in enumerate(files):
                     str_version = srunfile.split("/")[7][1:]
+                    lengths_versions.append(len(str_version))
                     str_parts = str_version.split(".")
                     str_parts_float = [float(''.join(filter(str.isdigit, str_parts[iii]))) for iii in range(len(str_parts))]
                     for pi, part in enumerate(str_parts_float):
@@ -113,7 +177,13 @@ def add_dl1_paths_to_dict(DICT, dl1_root, dchecking=False):
                         else:
                             final_str = final_str + f"{part:04.0f}"                
                     versions.append(float(final_str)) 
-                version_index = np.argmax(versions)
+
+                version_index = 0
+                for i in range(1, len(versions)):
+                    if versions[i] > versions[version_index]:
+                        version_index = i
+                    elif versions[i] == versions[version_index] and lengths_versions[i] < lengths_versions[version_index]:
+                        version_index = i
 
                 for i, subrunfile in enumerate(files):
                     selected = "(SELECTED)" if i == version_index else ""
