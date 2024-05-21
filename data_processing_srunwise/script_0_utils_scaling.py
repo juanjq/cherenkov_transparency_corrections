@@ -2,6 +2,7 @@ import numpy as np
 import json
 import sys
 import os
+import copy
 from scipy.optimize import curve_fit
 from scipy.stats import chi2
 import subprocess
@@ -144,12 +145,28 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
         A dictionary with all other needed parameters:
         "srun_numbers", "dict_dchecks", "ref_intensity", "dcheck_intensity_binning", "dcheck_intensity_binning_widths", 
         "dcheck_intensity_binning_centers", "mask_dcheck_bins_fit", "corr_factor_p0", "corr_factor_p1", "root_sub_dl1"
-        "dir_dl1b_scaled", "limits_intensity", "limits_intensity_extended", "config_file", "ref_p0", "ref_p1"
+        "dir_dl1b_scaled", "limits_intensity", "limits_intensity_extended", "config_file", "ref_p0", "ref_p1", "number_tries_dl1"
     """
 
     # --------------------------------------
     # Reading the other variables dictionary
-    locals().update(other_parameters)
+    srun_numbers = other_parameters["srun_numbers"]
+    dict_dchecks = other_parameters["dict_dchecks"]
+    ref_intensity = other_parameters["ref_intensity"]
+    dcheck_intensity_binning = other_parameters["dcheck_intensity_binning"]
+    dcheck_intensity_binning_widths = other_parameters["dcheck_intensity_binning_widths"]
+    dcheck_intensity_binning_centers = other_parameters["dcheck_intensity_binning_centers"]
+    mask_dcheck_bins_fit = other_parameters["mask_dcheck_bins_fit"]
+    corr_factor_p0 = other_parameters["corr_factor_p0"]
+    corr_factor_p1 = other_parameters["corr_factor_p1"]
+    root_sub_dl1 = other_parameters["root_sub_dl1"]
+    dir_dl1b_scaled = other_parameters["dir_dl1b_scaled"]
+    limits_intensity = other_parameters["limits_intensity"]
+    limits_intensity_extended = other_parameters["limits_intensity_extended"]
+    config_file = other_parameters["config_file"]
+    ref_p0 = other_parameters["ref_p0"]
+    ref_p1 = other_parameters["ref_p1"]
+    number_tries_dl1 = other_parameters["number_tries_dl1"]
     
     # Creating a arrray of subruns looking at the datachecks and also extracting the run number
     run_number  = dict_results["run"]
@@ -204,15 +221,23 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
                 command_dl1ab = command_dl1ab + f" --no-image --light-scaling {data_scale_factor} --intensity-range {dl1_selected_range}"
                 logger.info(command_dl1ab)
 
-                subprocess.run(command_dl1ab, shell=True)
-                # # We add an exception because sometimes can fail...
-                # ntries = 3
-                # while ntries > 0:
-                #     try:
-                #         ntries = ntries - 1
-                #         subprocess.run(command_dl1ab, shell=True)
-                #     except Exception as e:
-                #         logger.error(f"Failed to run {command_dl1ab} with error: {repr(e)}")
+                # subprocess.run(command_dl1ab, shell=True)
+                # We add an exception because sometimes can fail...
+                dl1_creation_suceeded = False
+                ntries = copy.copy(number_tries_dl1)
+                while ntries > 0 and (not dl1_creation_suceeded):
+                    subprocess.run(command_dl1ab, shell=True)
+                    # Now we check if the file exists
+                    if os.path.exists(data_output_fname):
+                        dl1_creation_suceeded = True
+                    else:
+                        logger.error(f"Try {number_tries_dl1 - ntries}/{number_tries_dl1}: No file created with: {command_dl1ab}")
+                        ntries = ntries - 1
+                if not dl1_creation_suceeded:
+                    logger.error(f"No file created after {number_tries_dl1} tries.")
+                    sys.exit()
+                        
+                    
         
         # ////////////////////////////////////////////////////////////
         # ////////////////////////////////////////////////////////////
@@ -233,16 +258,22 @@ def find_scaling(iteration_step, dict_results, other_parameters, simulated=False
                 command_dl1ab = command_dl1ab + f" --no-image --light-scaling {data_scale_factor}"
                 logger.info(command_dl1ab)
 
-                subprocess.run(command_dl1ab, shell=True)
-                
-                # # We add an exception because sometimes can fail...
-                # ntries = 3
-                # while ntries > 0:
-                #     try:
-                #         ntries = ntries - 1
-                #         subprocess.run(command_dl1ab, shell=True)
-                #     except Exception as e:
-                #         logger.error(f"Failed to run {command_dl1ab} with error: {repr(e)}")
+                # subprocess.run(command_dl1ab, shell=True)
+                # We add an exception because sometimes can fail...
+                dl1_creation_suceeded = False
+                ntries = copy.copy(number_tries_dl1)
+                while ntries > 0 and (not dl1_creation_suceeded):
+                    subprocess.run(command_dl1ab, shell=True)
+
+                    # Now we check if the file exists
+                    if os.path.exists(data_output_fname):
+                        dl1_creation_suceeded = True
+                    else:
+                        logger.error(f"Try {number_tries_dl1 - ntries}/{number_tries_dl1}: No file created with: {command_dl1ab}")
+                        ntries = ntries - 1
+                if not dl1_creation_suceeded:
+                    logger.error(f"No file created after {number_tries_dl1} tries.")
+                    sys.exit()
     
             # We store this info also in the dictionary in the final case
             dict_results["filenames"][srun] = data_output_fname

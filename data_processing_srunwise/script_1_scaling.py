@@ -72,6 +72,8 @@ def main_irf_creation():
     
 def main_init(input_str, simulate_data=False):
 
+    logger.info(f"Input string: {input_str}")
+
     ########################################
     # Initial configuring and paths creation
     # Extracting the run number from the input string
@@ -81,9 +83,9 @@ def main_init(input_str, simulate_data=False):
         srun_numbers = np.array(first_last_srun)
     else:
         srun_numbers = np.arange(first_last_srun[0], first_last_srun[1] + 1)
-    
+
     # Empty dictionary to store all the results of one run.
-    dict_results_empty = copy.deepcopy(script_0_utils_scaling.dict_results_empty)
+    dict_results_empty = copy.deepcopy(utils.dict_results_empty)
     dict_results_empty["run"] = run_number
     
     # Create the paths that do not exist
@@ -133,7 +135,7 @@ def main_init(input_str, simulate_data=False):
     dcheck_telapsed = np.array(dcheck_telapsed)
     
     dict_dchecks[run_number]["time"] = {
-        "tstart"   : dcheck_tstart[0],            # datetime object
+        "tstart"   : dcheck_tstart[0],         # datetime object
         "telapsed" : np.sum(dcheck_telapsed),  # s
         "srunwise" : {
             "telapsed" : dcheck_telapsed,      # s      
@@ -207,16 +209,24 @@ def main_init(input_str, simulate_data=False):
     ####################################################
     # Parameters to input to the find_scaling() function
     other_parameters = {
-        key: globals()[key] for key in [
-            "srun_numbers", "dict_dchecks", "ref_intensity",
-            "dcheck_intensity_binning", "dcheck_intensity_binning_widths",
-            "dcheck_intensity_binning_centers", "mask_dcheck_bins_fit",
-            "corr_factor_p0", "corr_factor_p1", "root_sub_dl1",
-            "dir_dl1b_scaled", "limits_intensity", "limits_intensity_extended",
-            "config_file", "ref_p0", "ref_p1"
-        ]
+        "srun_numbers": srun_numbers,
+        "dict_dchecks": dict_dchecks,
+        "ref_intensity": ref_intensity,
+        "dcheck_intensity_binning": dcheck_intensity_binning,
+        "dcheck_intensity_binning_widths": dcheck_intensity_binning_widths,
+        "dcheck_intensity_binning_centers": dcheck_intensity_binning_centers,
+        "mask_dcheck_bins_fit": mask_dcheck_bins_fit,
+        "corr_factor_p0": corr_factor_p0,
+        "corr_factor_p1": corr_factor_p1,
+        "root_sub_dl1": root_sub_dl1,
+        "dir_dl1b_scaled": dir_dl1b_scaled,
+        "limits_intensity": limits_intensity,
+        "limits_intensity_extended": limits_intensity_extended,
+        "config_file": config_file,
+        "ref_p0": ref_p0,
+        "ref_p1": ref_p1,
+        "number_tries_dl1": number_tries_dl1,
     }
-
 
     #######################
     # Reading original data
@@ -363,7 +373,7 @@ def main_merge():
     for run in files_total_runs:
 
         # Empty dictionary to store all the results of one run.
-        tmp = copy.deepcopy(script_0_utils_scaling.dict_results_empty)
+        tmp = copy.deepcopy(utils.dict_results_empty)
         tmp["run"] = run
         dict_runs[run] = tmp
         
@@ -414,7 +424,6 @@ def main_merge():
                 else:
                     logger.warning(f"No valid neighbors found for run {run} subrun {srun}. Unable to interpolate.")
 
-
     #######################
     # Reading the datacheck
     # Getting coordinates of source
@@ -437,7 +446,11 @@ def main_merge():
     dict_dchecks = lstpipeline.add_dl1_paths_to_dict(dict_dchecks, root_dl1)
     dict_dchecks = lstpipeline.add_dl1_paths_to_dict(dict_dchecks, root_dl1, dchecking=True)
     
-    for run_number in files_total_runs:
+    for ir, run_number in enumerate(files_total_runs):
+
+        nsubruns = len(dict_dchecks[run_number]["dchecks"]["srunwise"])
+        logger.info(f"Creating dictionary for Run {run_number} -{ir / len(files_total_runs) * 100:.1f}% --> {nsubruns} sruns")
+        
         dcheck_zd, dcheck_az = [], []
         dcheck_tstart, dcheck_telapsed = [], []
         
@@ -471,15 +484,15 @@ def main_merge():
                 "az" : dcheck_az, # deg
             },
         }
-    
+
     # then we also select the RFs and MC files looking at the nodes available
-    dict_dchecks, dict_nodes = lstpipeline.add_rf_node(dict_dchecks, root_rfs, root_mcs, dict_source)
-    
+    dict_dchecks = lstpipeline.add_rf_node(dict_dchecks, root_rfs, dict_source)
+
     ##########################################
     # Then calculating the interpolated values
     for ir, run_number in enumerate(files_total_runs):
     
-        # logger.info(f"Interpolating... {run_number} -{ir / len(files_total_runs) * 100:.1f}%")
+        logger.info(f"Interpolating... {run_number} -{ir / len(files_total_runs) * 100:.1f}%")
         dict_results = dict_runs[run_number]
     
         x_fit = np.cumsum(dict_dchecks[run_number]["time"]["srunwise"]["telapsed"])
@@ -554,6 +567,8 @@ def main_merge():
 
     
 def main_final(input_str, simulate_data=False):
+
+    logger.info(f"Input string: {input_str}")
 
     ################
     # First calculus
@@ -686,16 +701,24 @@ def main_final(input_str, simulate_data=False):
     ####################################################
     # Parameters to input to the find_scaling() function
     other_parameters = {
-        key: globals()[key] for key in [
-            "srun_numbers", "dict_dchecks", "ref_intensity",
-            "dcheck_intensity_binning", "dcheck_intensity_binning_widths",
-            "dcheck_intensity_binning_centers", "mask_dcheck_bins_fit",
-            "corr_factor_p0", "corr_factor_p1", "root_sub_dl1",
-            "dir_dl1b_scaled", "limits_intensity", "limits_intensity_extended",
-            "config_file", "ref_p0", "ref_p1"
-        ]
+        "srun_numbers": srun_numbers,
+        "dict_dchecks": dict_dchecks,
+        "ref_intensity": ref_intensity,
+        "dcheck_intensity_binning": dcheck_intensity_binning,
+        "dcheck_intensity_binning_widths": dcheck_intensity_binning_widths,
+        "dcheck_intensity_binning_centers": dcheck_intensity_binning_centers,
+        "mask_dcheck_bins_fit": mask_dcheck_bins_fit,
+        "corr_factor_p0": corr_factor_p0,
+        "corr_factor_p1": corr_factor_p1,
+        "root_sub_dl1": root_sub_dl1,
+        "dir_dl1b_scaled": dir_dl1b_scaled,
+        "limits_intensity": limits_intensity,
+        "limits_intensity_extended": limits_intensity_extended,
+        "config_file": config_file,
+        "ref_p0": ref_p0,
+        "ref_p1": ref_p1,
+        "number_tries_dl1": number_tries_dl1,
     }
-
 
     ##############################################################################################################
     # Scaling the final files and also saving the final results dictionary with all the information o fthe process
