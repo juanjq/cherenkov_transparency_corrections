@@ -3,6 +3,7 @@ import astropy.units as u
 from datetime import datetime
 import sys
 import os
+import json
 import subprocess
 import tables
 
