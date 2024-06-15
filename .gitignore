@@ -6,6 +6,7 @@
 **/__pycache__/*
 **/.ipynb_checkpoints/*
 *.log
+**.out
 # Not storing save-state of objects
 **/objects/*
 # Other large files
