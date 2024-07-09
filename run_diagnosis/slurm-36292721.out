@@ -1,3 +1,0 @@
-Reading hdf table
-/var/spool/slurm//job36292721/slurm_script: line 4: 31120 Killed                  python script_add_radec.py /fefs/aswg/workspace/juan.jimenez/data/cherenkov_transparency_corrections/crab/dl2/dl2_LST-1.Run03095.h5 /fefs/aswg/workspace/juan.jimenez/data/cherenkov_transparency_corrections/crab/dl2_radec/
-slurmstepd: error: Detected 1 oom-kill event(s) in step 36292721.batch cgroup. Some of your processes may have been killed by the cgroup out-of-memory handler.

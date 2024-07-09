@@ -77,7 +77,7 @@ def main(
         table_dl2.sort_index(inplace=True)
 
         # Then we store it with the default key
-        logger.info(f"Storing in a new file\n--> {output_file}")
+        logger.info(f"\nStoring in a new file\n--> {output_file}")
         table_dl2.to_hdf(output_file, "/dl1/event/telescope/parameters/LST_LSTCam")
 
     else:

@@ -2,6 +2,8 @@ import numpy as np
 import glob
 import re
 import os
+import tables
+import pandas as pd
 
 
 def check_files_exist(global_variables):
@@ -11,13 +13,24 @@ def check_files_exist(global_variables):
             raise FileNotFoundError(f"Input DL{file[-1:]} file ({global_variables[file]}) not found.")
         if not (os.path.isfile(global_variables[file+"_scaled"])): #
             raise FileNotFoundError(f"Input DL{file[-1:]} scaled file ({global_variables[file+'_scaled']}) not found.") #
-    file = f"path_dl2_radec"
-    if not (os.path.isfile(global_variables[file])):
-        raise FileNotFoundError(f"Input DL2-radec file ({global_variables[file]}) not found.")
-    if not (os.path.isfile(global_variables[file+"_scaled"])): #
-        raise FileNotFoundError(f"Input DL2-radec scaled file ({global_variables[file+'_scaled']}) not found.") #
     
+def open_files(global_variables):
+    key_dl1="/dl1/event/telescope/parameters/LST_LSTCam"
+    key_dl2="/dl2/event/telescope/parameters/LST_LSTCam"
+    
+    # Checking if all files exist
+    check_files_exist(global_variables=global_variables) 
+    
+    # Opening the tables for DL1 and DL2 as well as for the datacheck
+    table_dl1_datacheck = tables.open_file(global_variables["path_dl1_dcheck"]).root.dl1datacheck
 
+    table_dl1 = pd.read_hdf(global_variables[f"path_dl1"], key_dl1)
+    table_dl2 = pd.read_hdf(global_variables[f"path_dl2"], key_dl2)
+    table_dl1_scaled = pd.read_hdf(global_variables[f"path_dl1_scaled"], key_dl1) #
+    table_dl2_scaled = pd.read_hdf(global_variables[f"path_dl2_scaled"], key_dl2) #
+    
+    return table_dl1_datacheck, table_dl1, table_dl2, table_dl1_scaled, table_dl2_scaled ##
+    
 def find_dl1_fname(run_number, dchecking=False, version_string="v*", return_version=False, print_details=True):
     str_dchecks = "" if not dchecking else "datacheck_"
 
